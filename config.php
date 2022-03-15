@@ -1,6 +1,6 @@
 <?php
 
-define("Production", false);
+define("Production", true);
 
 define("DATABASE", [
     'SERVERNAME' => 'localhost',
@@ -10,3 +10,7 @@ define("DATABASE", [
 ]);
 
 define('API_URL', 'https://api.binance.com');
+
+define('Proxys', [
+    
+]);

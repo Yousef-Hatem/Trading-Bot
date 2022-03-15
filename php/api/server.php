@@ -27,11 +27,18 @@
 
         public function getUsers()
         {
-            return $this->request("/users")->data;
+            return $this->request("/coinusers")->data;
         }
 
         public function getCurrenciesConfig()
         {
-            return $this->request("/coinsetting")->data;
+            $request = $this->request("/coinsetting");
+            
+            if (isset($request->data)) {
+                return $request->data;
+            } else {
+                return $this->getCurrenciesConfig();
+                printCmd($request);
+            }
         }
     }

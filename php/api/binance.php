@@ -4,6 +4,23 @@
 
         public function request($route, $timestamp = false, $API_SECRET = null, $API_KEY = null, $parameters = [], $method = 'GET')
         {
+            global $proxys;
+            $proxy = null;
+
+            for ($i=0; $i < count($proxys); $i++) {
+                if ((time() - $proxys[$i]['time']) > 60) {
+                    $proxys[$i]['time'] = time();
+                    $proxys[$i]['numberOrders'] = 0;
+                }
+
+                if ($proxys[$i]['numberOrders'] < 1000) {
+                    if (!isset($proxy)) {
+                        $proxy = $proxys[$i]['proxy'];
+                        $proxys[$i]['numberOrders']++;
+                    }
+                }
+            }
+            
             $data = "";
             $API = new API();
             $telegram = new telegramAPI();
@@ -27,13 +44,13 @@
 
             switch ($method) {
                 case 'GET':
-                    $data = $API->curlGet($url, $headers);
+                    $data = $API->curlGet($url, $headers, $proxy);
                     break;
                 case 'POST':
-                    $data = $API->curlPost($url, $headers);
+                    $data = $API->curlPost($url, $headers, [], $proxy);
                     break;
                 case 'DELETE':
-                    $data = $API->curlDelete($url, $headers);
+                    $data = $API->curlDelete($url, $headers, $proxy);
                     break;
                 
                 default:
@@ -212,32 +229,36 @@
 
         public function permissionBuy($user, $symbol)
         {
-            $database = new Database();
-            $balance = $this->getBalance($user, true);
-            $maxNumberCoins = numberFormatPrecision($balance/600, 0);
-            $coins = [];
-            $numberDeals = 0;
-            foreach ($database->isTrading() as $trading) {
-                $index = array_search($user->username, $trading['users'], true);
-                if (($index === 0 || $index > 0)) {
-                    if ($trading['currency'] == $symbol) {
-                        $numberDeals++;
+            foreach ($user->coins as $coin) {
+                if ($coin->symbol == $symbol) {
+                    $database = new Database();
+                    $balance = $this->getBalance($user, true);
+                    $maxNumberCoins = numberFormatPrecision($balance/600, 0);
+                    $coins = [];
+                    $numberDeals = 0;
+                    foreach ($database->isTrading() as $trading) {
+                        $index = array_search($user->username, $trading['users'], true);
+                        if (($index === 0 || $index > 0)) {
+                            if ($trading['currency'] == $symbol) {
+                                $numberDeals++;
+                            }
+                            $i = array_search($symbol, $coins, true);
+                            if (!($i === 0 || $i > 0)) {
+                                array_push($coins, $symbol);
+                            }
+                        }
                     }
-                    $i = array_search($symbol, $coins, true);
-                    if (!($i === 0 || $i > 0)) {
-                        array_push($coins, $symbol);
+
+                    if ($numberDeals < 30 && $numberDeals > 0) {
+                        return true;
+                    } elseif($numberDeals == 30) {
+                        return false;
+                    }
+
+                    if ($maxNumberCoins > count($coins)) {
+                        return true;
                     }
                 }
-            }
-
-            if ($numberDeals < 30 && $numberDeals > 0) {
-                return true;
-            } elseif($numberDeals == 30) {
-                return false;
-            }
-
-            if ($maxNumberCoins > count($coins)) {
-                return true;
             }
 
             return false;
@@ -391,7 +412,6 @@
                 $currenciesConfig[$currencyConfig->symbol] = $currencyConfig;
             }
 
-            echo "\n\nIs Sell Coin";
             foreach ($trading as $coin) {
                 $currentPrice = $prices[$coin['currency']];
                 
@@ -418,17 +438,10 @@
                     $sell_up = $currencyConfig->ratio_sell;
                     $sell_down = $currencyConfig->execution_sell;
 
-                    echo "\n\n".$coin['currency'].'-'.$coin['id'].': '.date('m/d h:i:s');
-                    echo "\n".$oldChanges[$coin['currency'].'-'.$coin['id']]." >= ".$sell_up.' (sell-up)';
-                    echo "\n".($change - $oldChanges[$coin['currency'].'-'.$coin['id']])." <= ".($sell_down - (2*$sell_down)).' (sell-down)';
-                    echo "\noldChanges: ".$oldChanges[$coin['currency'].'-'.$coin['id']];
-
                     if ($oldChanges[$coin['currency'].'-'.$coin['id']] >= $sell_up && $change - $oldChanges[$coin['currency'].'-'.$coin['id']] < 0) {
                         $changes[$coin['currency'].'-'.$coin['id']] = $oldChanges[$coin['currency'].'-'.$coin['id']];
-                        echo "\nsell-up: ✔️";
 
                         if ($change - $oldChanges[$coin['currency'].'-'.$coin['id']] <= ($sell_down - (2*$sell_down))) {
-                            echo "\nsell-down: ✔️";
                             $this->salesOrder($coin['users'], $coin['currency'], $currentPrice);
                             $database->sellCoin($coin['id'], $currentPrice);
                             $telegram->deleteMsg($coin['msg_id']);

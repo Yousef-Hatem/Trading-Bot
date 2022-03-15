@@ -171,42 +171,4 @@
             return false;
         }
 
-        public function getUsers()
-        {
-            return $this->getData("* FROM users");
-        }
-
-        public function updateUsers()
-        {
-            $server = new serverAPI();
-            $serverUsers = [];
-            $users = [];
-            $addUsers = "";
-
-            foreach ($this->getUsers() as $user) {
-                $users[$user['username']] = $user['username'];
-            }
-
-            foreach ($server->getUsers() as $serverUser) {
-                $serverUsers[$serverUser->username] = $serverUser->username;
-            }
-
-            foreach ($serverUsers as $serverUser) {
-                if (!isset($users[$serverUser])) {
-                    $addUsers .= "('{$serverUser}'),";
-                }
-            }
-            if ($addUsers != '') {
-                $addUsers = substr_replace($addUsers ,"",-1);
-                $this->query("INSERT INTO users (`username`) VALUES {$addUsers}");
-            }
-
-            foreach ($users as $user) {
-                if (!isset($serverUsers[$user])) {
-                    $this->query("DELETE FROM users WHERE username = '{$user}'");
-                }
-            }
-
-        }
-
     }
