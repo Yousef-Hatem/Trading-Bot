@@ -64,7 +64,7 @@
                 return false;
             } elseif (isset($data->code)) {
                 if ($data->code != 200) {
-                    if ($data->code != -2014 && $data->code != -1022 && $data->code != -2015) {
+                    if ($data->code != -2014 && $data->code != -1022) {
                         if ($data->code == -1021) {
                             $this->request($route, $timestamp, $API_SECRET, $API_KEY, $parameters, $method);
                         } else {
@@ -210,7 +210,11 @@
                 $database = new Database();
                 $trading = $database->isTrading();
                 foreach ($trading as $symbol) {
-                    $request->total = $request->total + 20;
+                    $index = array_search($user->username, $symbol['users'], true);
+                    
+                    if (($index === 0 || $index > 0)) {
+                        $request->total += $user->budget_coin/30;
+                    }
                 }
             }
 
@@ -227,17 +231,52 @@
         }
 
 
+        public function userCoins($user)
+        {
+            $server = new serverAPI();
+            $currenciesConfig = $server->getCurrenciesConfig();
+            $coins = [];
+
+            for ($i=0; $i < $user->total_coin; $i++) { 
+                $coin = null;
+
+                foreach ($currenciesConfig as $currencyConfig) {
+                    if (isset($coin)) {
+                        $index = array_search($currencyConfig->symbol, $coins, true);
+
+                        if (!($index === 0 || $index > 0)) {
+                            if ($currencyConfig->price_highest < $coin->price_highest) {
+                                $coin = $currencyConfig;
+                            }
+                        }
+                    } else {
+                        $coin = $currencyConfig;
+                    }
+                }
+
+                array_push($coins, $coin->symbol);
+            }
+
+            return $coins;
+        }
+
+
         public function permissionBuy($user, $symbol)
         {
-            foreach ($user->coins as $coin) {
-                if ($coin->symbol == $symbol) {
-                    $database = new Database();
-                    $balance = $this->getBalance($user, true);
-                    $maxNumberCoins = numberFormatPrecision($balance/600, 0);
+            $userCoins = $this->userCoins($user);
+            $index = array_search($symbol, $userCoins, true);
+
+            if (($index === 0 || $index > 0)) {
+                $database = new Database();
+                $balance = $this->getBalance($user, true);
+
+                if ($balance >= $user->total_budget) {
                     $coins = [];
                     $numberDeals = 0;
+
                     foreach ($database->isTrading() as $trading) {
                         $index = array_search($user->username, $trading['users'], true);
+
                         if (($index === 0 || $index > 0)) {
                             if ($trading['currency'] == $symbol) {
                                 $numberDeals++;
@@ -248,16 +287,19 @@
                             }
                         }
                     }
-
+        
                     if ($numberDeals < 30 && $numberDeals > 0) {
                         return true;
                     } elseif($numberDeals == 30) {
                         return false;
                     }
-
-                    if ($maxNumberCoins > count($coins)) {
+        
+                    if ($user->total_coin > count($coins)) {
                         return true;
                     }
+                } else {
+                    $telegram = new telegramAPI();
+                    $telegram->balanceNotEnough($user, $balance);
                 }
             }
 
@@ -274,23 +316,26 @@
             $users = [];
             $symbolPrice = $this->getTickersPrice($symbol)->price;
             $exchangeInfo = $this->exchangeInfo($symbol);
-            $funds = 20;
-            $size = $this->symbolSizeFormat($symbol, $funds/$symbolPrice, $exchangeInfo->symbols[0]->filters);
             $body = [
                 "symbol" => $symbol,
                 "side" => "buy",
                 "type" => "market"
             ];
 
-            if ($exchangeInfo->symbols[0]->quoteOrderQtyMarketAllowed) {
-                $body['quoteOrderQty'] = $funds;
-            } else {
-                $body['quantity'] = $size;
-            }
-
+            
             foreach ($server->getUsers() as $user) {
                 if ($this->permissionBuy($user, $symbol)) {
+                    $funds = $user->budget_coin/30;
+                    $size = $this->symbolSizeFormat($symbol, $funds/$symbolPrice, $exchangeInfo->symbols[0]->filters);
+
+                    if ($exchangeInfo->symbols[0]->quoteOrderQtyMarketAllowed) {
+                        $body['quoteOrderQty'] = $funds;
+                    } else {
+                        $body['quantity'] = $size;
+                    }
+
                     array_push($users, $user->username);
+
                     if (Production) {
                         $this->request('/api/v3/order', true, $user->secret_key, $user->api_key, $body, 'POST');
                     } else {
@@ -311,7 +356,7 @@
         {
             foreach ($users as $user) {
                 $takerCommission = $this->tradeFees($user, $currency)[0]->takerCommission;
-                $size = 20/$currentPrice;
+                $size = ($user->budget_coin/30)/$currentPrice;
                 $fee = $takerCommission * $size;
                 $size = $size - $fee;
                 $size = $this->symbolSizeFormat($currency, $size);
@@ -426,9 +471,8 @@
                 }
 
                 if ($priceUpdate) {
-                    $gainPr = (($currentPrice/$coin['currency_price'])*100)-100;
-                    $gain = ($gainPr*20)/100;
-                    $telegram->symbolPriceUpdate($currentPrice, $coin['msg_id'], $gain, $gainPr);
+                    $gain = (($currentPrice/$coin['currency_price'])*100)-100;
+                    $telegram->symbolPriceUpdate($currentPrice, $coin['msg_id'], $gain);
                 }
 
                 $pricesUpdate[$coin['currency'].'-'.$coin['id']] = $currentPrice;

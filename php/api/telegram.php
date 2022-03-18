@@ -84,22 +84,20 @@ URL: '.$URL;
             return $this->request('/editMessageText', $msg, true, $msgID);
         }
 
-        public function symbolPriceUpdate($price, $msgID = false, $gain = null, $gainPr = null)
+        public function symbolPriceUpdate($price, $msgID = false, $gain = null)
         {
             $gain = number_format($gain, 4);
-            $gainPr = number_format($gainPr, 4);
-            if ($gainPr != 0) {
-                $gainS = ($gainPr > 0)? "▲": "▼";
+            if ($gain != 0) {
+                $gainS = ($gain > 0)? "▲": "▼";
             } else {
                 $gainS = "-";
             }
 
             $gain = abs($gain);
-            $gainPr = abs($gainPr);
-            $gainPr = $gainPr.' '.$gainS;
+            $gain = $gain.' '.$gainS;
             if ($msgID) {
                 $msg = '$'.$price.' 🪙'."
-(%{$gainPr} $"."{$gain})";
+(%{$gain})";
 
                 return $this->editMessageText($msgID, $msg);
             }
@@ -177,7 +175,8 @@ URL: '.$URL;
                                 break;
     
                             case '/REPORT':
-                                $reply = $this->report();
+                                $reply = "Sorry, but the report is not ready yet";
+                                // $reply = $this->report();
                                 break;
     
                             case '/EDITMAXGRIDS':
@@ -244,6 +243,11 @@ URL: '.$URL;
                     printCmd($msg, 'msg');
                 }
             }
+        }
+
+        public function balanceNotEnough($user, $balance)
+        {
+            return $this->sendMsg("The purchase of the currency for <b>\"{$user->username}\"</b> failed because his balance (".'$'."{$balance}) is less than the total budget (".'$'."{$user->total_budget})", false);
         }
 
         public function dailyReport($date, $prices = null, $orders = null, $trading = null)
