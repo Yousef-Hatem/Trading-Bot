@@ -53,7 +53,4 @@ function start() {
     }
 }
 
-// start();
-
-$database = new Database();
-printCmd($database->report(), 'report');
+start();
