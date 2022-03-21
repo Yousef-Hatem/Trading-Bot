@@ -4,13 +4,12 @@ include 'php/master.php';
 
 welcome();
 
-$dailyReport = false;
 $changes  = ['buy' => null, 'sell' => []];
 $prices = [];
 
 function trade()
 {
-    global $dailyReport, $changes, $prices, $max_grids;
+    global $changes, $prices, $max_grids;
     $time = time();
 
     $database = new Database();
@@ -27,11 +26,6 @@ function trade()
             
         if ($max_grids > count($trading)) {
             $changes['buy'] = $binance->perfectSymbols($changes['buy'], $max_grids - count($trading));
-        }
-        
-        if (date('H') == 23 && date('i') > 55 && !$dailyReport) {
-            $telegram->sendMsg($telegram->dailyReport(date('Y-m-d')));
-            $dailyReport = true;
         }
     }
 
@@ -59,4 +53,7 @@ function start() {
     }
 }
 
-start();
+// start();
+
+$database = new Database();
+printCmd($database->report(), 'report');

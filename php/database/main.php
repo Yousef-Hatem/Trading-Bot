@@ -93,9 +93,18 @@
 
         public function buyCoin($currency, $currencyPrice, $msgID, $users)
         {
+            $grid = 0;
+
+            foreach ($this->isTrading() as $trading) {
+                if ($trading['currency'] == $currency) {
+                    $grid++;
+                }
+            }
+
             return $this->insertData('purchase_orders', [
                 'currency' => $currency,
                 'currency_price' => $currencyPrice,
+                'grid' => $grid,
                 'users' => json_encode($users),
                 'msg_id' => $msgID
             ]);
@@ -111,19 +120,17 @@
 
         public function getOrders()
         {
-            $sql = "* FROM purchase_orders";
-            $data = $this->getData($sql);
-            $orders = [];
+            $orders = $this->getData('* FROM purchase_orders');
+            $count = count($orders);
 
-            for ($i=0; $i < count($data); $i++) { 
-                $order = $data[$i];
-                $id = $order['id'];
-
-                $orderData = $this->getData("* FROM sales_orders WHERE id_purchase_order = {$id}");
+            for ($i=0; $i < $count; $i++) {
+                $orderData = $this->getData("* FROM sales_orders WHERE id_purchase_order = {$orders[$i]['id']}");
                 
                 if (count($orderData)) {
-                    $order['sales'] = $orderData[0];
-                    array_push($orders, $order);
+                    $orders[$i]['users'] = json_decode($orders[$i]['users']);
+                    $orders[$i]['sales'] = $orderData[0];
+                } else {
+                    unset($orders[$i]);
                 }
             }
 
@@ -169,6 +176,67 @@
             }
 
             return false;
+        }
+
+        public function report()
+        {
+            $report = [];
+            $server = new serverAPI();
+            $users = $server->getUsers();
+            $orders = $this->getOrders();
+
+            foreach ($users as $user) {
+                $total_profits = 0;
+                $currencies = [];
+                $symbols = [];
+
+                foreach ($orders as $order) {
+                    $i1 = array_search($user->username, $order['users'], true);
+                    $i2 = array_search($order['currency'], $currencies, true);
+
+                    if (($i1 === 0 || $i1 > 0) && !($i2 === 0 || $i2 > 0)) {
+                        array_push($currencies, $order['currency']);
+
+                        $symbol = [
+                            'symbol' => $order['currency'],
+                            'total_profits' => 0,
+                            'grids' => [],
+                        ];
+
+                        foreach ($orders as $order) {
+                            $i = array_search($user->username, $order['users'], true);
+
+                            if (($i === 0 || $i > 0) && $symbol['symbol'] == $order['currency']) {
+                                $grid = [
+                                    'grid' => $order['grid'],
+                                    'earning' => number_format(((($user->budget_coin/30)/$order['currency_price']) * $order['sales']['current_price']) - ($user->budget_coin/30), 4),
+                                    'selling_price' => $order['sales']['current_price']
+                                ];
+
+                                array_push($symbol['grids'], $grid);
+
+                                $symbol['total_profits'] += $grid['earning'];
+                            }
+                        }
+
+                        $symbol['total_profits'] = number_format($symbol['total_profits'], 4);
+
+                        array_push($symbols, $symbol);
+
+                        $total_profits += $symbol['total_profits'];
+                    }
+                }
+
+                $data = [
+                    "username" => $user->username,
+                    "total_profits" => number_format($total_profits, 4),
+                    "symbols" => $symbols
+                ];
+
+                array_push($report, $data);
+            }
+
+            return $report;
         }
 
     }
