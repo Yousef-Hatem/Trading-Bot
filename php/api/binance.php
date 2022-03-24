@@ -268,38 +268,39 @@
 
             if (($index === 0 || $index > 0)) {
                 $database = new Database();
-                $balance = $this->getBalance($user, true);
 
-                if ($balance >= $user->total_budget) {
-                    $coins = [];
-                    $numberDeals = 0;
+                $coins = [];
+                $numberDeals = 0;
 
-                    foreach ($database->isTrading() as $trading) {
-                        $index = array_search($user->username, $trading['users'], true);
+                foreach ($database->isTrading() as $trading) {
+                    $index = array_search($user->username, $trading['users'], true);
 
-                        if (($index === 0 || $index > 0)) {
-                            if ($trading['currency'] == $symbol) {
-                                $numberDeals++;
-                            }
-                            $i = array_search($symbol, $coins, true);
-                            if (!($i === 0 || $i > 0)) {
-                                array_push($coins, $symbol);
-                            }
+                    if (($index === 0 || $index > 0)) {
+                        if ($trading['currency'] == $symbol) {
+                            $numberDeals++;
+                        }
+                        $i = array_search($symbol, $coins, true);
+                        if (!($i === 0 || $i > 0)) {
+                            array_push($coins, $symbol);
                         }
                     }
-        
-                    if ($numberDeals < 30 && $numberDeals > 0) {
-                        return true;
-                    } elseif($numberDeals == 30) {
-                        return false;
-                    }
-        
-                    if ($user->total_coin > count($coins)) {
-                        return true;
-                    }
+                }
+
+                $balance = $this->getBalance($user, true);
+                if ($balance >= $user->total_budget) {
+                    $maxNumberDeals = 30;
                 } else {
-                    $telegram = new telegramAPI();
-                    $telegram->balanceNotEnough($user, $balance);
+                    $maxNumberDeals = numberFormatPrecision(($balance/$user->total_coin)/($user->budget_coin/30), 0);
+                }
+                
+                if ($numberDeals < $maxNumberDeals && $numberDeals > 0) {
+                    return true;
+                } elseif($numberDeals == $maxNumberDeals) {
+                    return false;
+                }
+    
+                if ($user->total_coin > count($coins)) {
+                    return true;
                 }
             }
 
@@ -326,11 +327,11 @@
             foreach ($server->getUsers() as $user) {
                 if ($this->permissionBuy($user, $symbol)) {
                     $funds = $user->budget_coin/30;
-                    $size = $this->symbolSizeFormat($symbol, $funds/$symbolPrice, $exchangeInfo->symbols[0]->filters);
-
+                    
                     if ($exchangeInfo->symbols[0]->quoteOrderQtyMarketAllowed) {
                         $body['quoteOrderQty'] = $funds;
                     } else {
+                        $size = $this->symbolSizeFormat($symbol, $funds/$symbolPrice, $exchangeInfo->symbols[0]->filters);
                         $body['quantity'] = $size;
                     }
 
@@ -344,33 +345,41 @@
                 }
             }
 
-            $telegram->sendBuy($symbol, $size, $symbolPrice);
-            $msgID = $telegram->symbolPriceUpdate($symbolPrice, false)->result->message_id;
-            $database->buyCoin($symbol, $symbolPrice, $msgID, $users);
+            if (count($users)) {
+                $telegram->sendBuy($symbol, $symbolPrice);
+                $msgID = $telegram->symbolPriceUpdate($symbolPrice, false)->result->message_id;
+                $database->buyCoin($symbol, $symbolPrice, $msgID, $users);
+            }
 
             return true;
         }
 
 
-        public function salesOrder($users, $currency, $currentPrice)
+        public function salesOrder($usersname, $currency, $currentPrice)
         {
-            foreach ($users as $user) {
-                $takerCommission = $this->tradeFees($user, $currency)[0]->takerCommission;
-                $size = ($user->budget_coin/30)/$currentPrice;
-                $fee = $takerCommission * $size;
-                $size = $size - $fee;
-                $size = $this->symbolSizeFormat($currency, $size);
-                $body = [
-                    "symbol" => $currency,
-                    "side" => "sell",
-                    "type" => "market",
-                    "quantity" => $size
-                ];
-    
-                if (Production) {
-                    $this->request('/api/v3/order', true, $user->secret_key, $user->api_key, $body, 'POST');
-                } else {
-                    $this->request('/api/v3/order/test', true, $user->secret_key, $user->api_key, $body, 'POST');
+            $server = new serverAPI();
+
+            foreach ($server->getUsers() as $user) {
+                $index = array_search($user->username, $usersname, true);
+                    
+                if (($index === 0 || $index > 0)) {
+                    $takerCommission = $this->tradeFees($user, $currency)[0]->takerCommission;
+                    $size = ($user->budget_coin/30)/$currentPrice;
+                    $fee = $takerCommission * $size;
+                    $size = $size - $fee;
+                    $size = $this->symbolSizeFormat($currency, $size);
+                    $body = [
+                        "symbol" => $currency,
+                        "side" => "sell",
+                        "type" => "market",
+                        "quantity" => $size
+                    ];
+        
+                    if (Production) {
+                        $this->request('/api/v3/order', true, $user->secret_key, $user->api_key, $body, 'POST');
+                    } else {
+                        $this->request('/api/v3/order/test', true, $user->secret_key, $user->api_key, $body, 'POST');
+                    }
                 }
             }
         }

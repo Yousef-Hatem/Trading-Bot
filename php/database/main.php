@@ -93,7 +93,7 @@
 
         public function buyCoin($currency, $currencyPrice, $msgID, $users)
         {
-            $grid = 0;
+            $grid = 1;
 
             foreach ($this->isTrading() as $trading) {
                 if ($trading['currency'] == $currency) {

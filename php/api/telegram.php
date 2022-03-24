@@ -31,7 +31,7 @@
                     if ($request->error_code == 429) {
                         sleep($request->parameters->retry_after);
                         return $this->request($route, $msg, $disableNotification, $messageID, $offset);
-                    } else {
+                    } elseif ($request->error_code != 400) {
                         printCmd($request, 'request');
                         printCmd($url, 'url');
                         printCmd($postdata, 'postdata');
@@ -47,9 +47,9 @@
             return $this->request('/sendMessage', $msg, $disableNotification, $reply);
         }
 
-        public function sendBuy($symbol, $size, $symbolPrice)
+        public function sendBuy($symbol, $symbolPrice)
         {
-            $msg = "<b>🤖 I just bought {$size} {$symbol} and the price was {$symbolPrice}$</b>";
+            $msg = "<b>🤖 I just bought {$symbol} and the price was {$symbolPrice}$</b>";
 
             $this->sendMsg($msg, false);
 
@@ -58,7 +58,7 @@
 
         public function sendSell($symbol, $symbolPrice)
         {            
-            $msg = "<b>🤖 I sold {$symbol} when it hit {$symbolPrice}$";
+            $msg = "<b>🤖 I sold {$symbol} when it hit {$symbolPrice}$</b>";
             
             $this->sendMsg($msg, false);
 
@@ -90,14 +90,13 @@ URL: '.$URL;
             if ($gain != 0) {
                 $gainS = ($gain > 0)? "▲": "▼";
             } else {
-                $gainS = "-";
+                $gainS = '';
             }
 
             $gain = abs($gain);
             $gain = $gain.' '.$gainS;
             if ($msgID) {
-                $msg = '$'.$price.' 🪙'."
-(%{$gain})";
+                $msg = '$'.$price.' 🪙'." (%{$gain})";
 
                 return $this->editMessageText($msgID, $msg);
             }
@@ -121,7 +120,9 @@ URL: '.$URL;
 
                 if ($count) {
                     $database->updateID($result[$count-1]->update_id);
-                    return $result[$count-1]->message;
+                    if ($result[$count-1]->message) {
+                        return $result[$count-1]->message;
+                    }
                 }
             }
             
@@ -242,10 +243,5 @@ URL: '.$URL;
                     printCmd($msg, 'msg');
                 }
             }
-        }
-
-        public function balanceNotEnough($user, $balance)
-        {
-            return $this->sendMsg("The purchase of the currency for <b>\"{$user->username}\"</b> failed because his balance (".'$'."{$balance}) is less than the total budget (".'$'."{$user->total_budget})", false);
         }
     }
