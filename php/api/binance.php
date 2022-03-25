@@ -388,14 +388,24 @@
         public function perfectSymbols($oldChanges = null, $max)
         {
             $server = new serverAPI();
+            $database = new Database();
+            $trades = $database->isTrading();
             $currencies = [];
             $coins = [];
             $data = [];
             $number = 0;
 
             foreach ($server->getCurrenciesConfig() as $currency) {
+                $price = $currency->price_highest;
+
+                foreach ($trades as $trade) {
+                    if ($trade['currency'] == $currency->symbol) {
+                        $price = $trade['currency_price'];
+                    }
+                }
+
                 $currencies[$currency->symbol] = [
-                    'price' => $currency->price_highest,
+                    'price' => $price,
                     'buy_down' => $currency->ratio_buy,
                     'buy_up' => $currency->execution_buy
                 ];
@@ -423,12 +433,13 @@
 
             if (is_array($oldChanges)) {
                 foreach ($oldChanges as $key => $oldChange) {
-                    if ($max >= $number) {
-                        $change = $oldChange - $data[$key];
+                    if ($max > $number) {
+                        $change = $data[$key] - $oldChange;
     
+                        
                         if ($change > 0) {
                             $currency = $currencies[$key];
-
+                            
                             if ($change >= $currency['buy_up']) {
                                 $this->newOrder($key);
                                 $number++;
