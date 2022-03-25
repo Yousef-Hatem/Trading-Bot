@@ -35,10 +35,22 @@ function report()
         ];
     }
 
+    if (!isset($_GET['type'])) {
+        return [
+            'status' => false,
+            'error' => "type has not been sent"
+        ];
+    } elseif ($_GET['type'] != "sell" && $_GET['type'] != "buy") {
+        return [
+            'status' => false,
+            'error' => "This type is not defined. You can send 'sell' or 'buy'"
+        ];
+    }
+
     return [
         'status' => true,
         'time' => time(),
-        'data' => $database->report()
+        'data' => $database->report($_GET['type'])
     ];
 }
 

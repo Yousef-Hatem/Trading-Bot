@@ -178,60 +178,96 @@
             return false;
         }
 
-        public function report()
+        public function report($type)
         {
             $report = [];
             $server = new serverAPI();
+            
+            if ($type == "sell") {
+                $orders = $this->getOrders();
+            } elseif ($type == "buy") {
+                $trading = $this->isTrading();
+            } else {
+                return false;
+            }
+
             $users = $server->getUsers();
-            $orders = $this->getOrders();
 
             foreach ($users as $user) {
                 $total_profits = 0;
                 $currencies = [];
                 $symbols = [];
 
-                foreach ($orders as $order) {
-                    $i1 = array_search($user->username, $order['users'], true);
-                    $i2 = array_search($order['currency'], $currencies, true);
-
-                    if (($i1 === 0 || $i1 > 0) && !($i2 === 0 || $i2 > 0)) {
-                        array_push($currencies, $order['currency']);
-
-                        $symbol = [
-                            'symbol' => $order['currency'],
-                            'total_profits' => 0,
-                            'grids' => [],
-                        ];
-
-                        foreach ($orders as $order) {
-                            $i = array_search($user->username, $order['users'], true);
-
-                            if (($i === 0 || $i > 0) && $symbol['symbol'] == $order['currency']) {
-                                $grid = [
-                                    'grid' => $order['grid'],
-                                    'earning' => number_format(((($user->budget_coin/30)/$order['currency_price']) * $order['sales']['current_price']) - ($user->budget_coin/30), 4),
-                                    'selling_price' => $order['sales']['current_price']
-                                ];
-
-                                array_push($symbol['grids'], $grid);
-
-                                $symbol['total_profits'] += $grid['earning'];
+                if ($type ==  "sell") {
+                    foreach ($orders as $order) {
+                        $i1 = array_search($user->username, $order['users'], true);
+                        $i2 = array_search($order['currency'], $currencies, true);
+    
+                        if (($i1 === 0 || $i1 > 0) && !($i2 === 0 || $i2 > 0)) {
+                            array_push($currencies, $order['currency']);
+    
+                            $symbol = [
+                                'symbol' => $order['currency'],
+                                'total_profits' => 0,
+                                'grids' => [],
+                            ];
+    
+                            foreach ($orders as $order) {
+                                $i = array_search($user->username, $order['users'], true);
+    
+                                if (($i === 0 || $i > 0) && $symbol['symbol'] == $order['currency']) {
+                                    $grid = [
+                                        'grid' => $order['grid'],
+                                        'earning' => number_format(((($user->budget_coin/30)/$order['currency_price']) * $order['sales']['current_price']) - ($user->budget_coin/30), 4),
+                                        'selling_price' => $order['sales']['current_price'],
+                                        'date' => $order['sales']['date']
+                                    ];
+    
+                                    array_push($symbol['grids'], $grid);
+    
+                                    $symbol['total_profits'] += $grid['earning'];
+                                }
                             }
+    
+                            $symbol['total_profits'] = number_format($symbol['total_profits'], 4);
+    
+                            array_push($symbols, $symbol);
+    
+                            $total_profits += $symbol['total_profits'];
                         }
+                    }
+                }
+                
 
-                        $symbol['total_profits'] = number_format($symbol['total_profits'], 4);
-
-                        array_push($symbols, $symbol);
-
-                        $total_profits += $symbol['total_profits'];
+                if ($type == "buy") {
+                    foreach ($trading as $trade) {
+                        $i = array_search($user->username, $trade['users'], true);
+    
+                        if (($i === 0 || $i > 0)) {
+                            $openTrade = [
+                                'symbol' => $trade['currency'],
+                                'grid' => $trade['grid'],
+                                'price' => $trade['currency_price'],
+                                'amount_buy' => $user->budget_coin/30,
+                                'date' => $trade['date']
+                            ];
+                            array_push($symbols, $openTrade);
+                        }
                     }
                 }
 
+
                 $data = [
                     "username" => $user->username,
-                    "total_profits" => number_format($total_profits, 4),
+                    "total_profits" => 0,
                     "symbols" => $symbols
                 ];
+
+                if ($type ==  "sell") {
+                    $data['total_profits'] = number_format($total_profits, 4);
+                } else {
+                    unset($data['total_profits']);
+                }
 
                 array_push($report, $data);
             }
