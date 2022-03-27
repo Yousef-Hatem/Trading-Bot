@@ -45,7 +45,7 @@ function start() {
     while($active) {
         if (microtime(true) >= $nextTime) {
             $time = trade();
-            echo "\n\nEnd (Time: ".$time.'s)';
+            echo "\n\nEnd (Time: ".$time.'s) '.date('d h:i:s');
             $nextTime = microtime(true);
         }
 

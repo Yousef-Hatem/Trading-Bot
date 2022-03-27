@@ -19,7 +19,7 @@
                 $telegram->sendError($request->error, $route);
                 return false;
             } else {
-                printCmd($request, 'request');
+                printCmd($request, 'server request');
                 return false;
             }
 

@@ -435,12 +435,12 @@
                 foreach ($oldChanges as $key => $oldChange) {
                     if ($max > $number) {
                         $change = $data[$key] - $oldChange;
-    
-                        
+
                         if ($change > 0) {
                             $currency = $currencies[$key];
                             
                             if ($change >= $currency['buy_up']) {
+                                printCmd($data[$key]." - ".$oldChange." >= ".$currency['buy_up'], $key);
                                 $this->newOrder($key);
                                 $number++;
 
@@ -450,6 +450,12 @@
                             }
                         }
                     }
+                }
+            }
+
+            foreach ($data as $key => $change) {
+                if ($change > ($currency['buy_down'] - (2*$currency['buy_down']))) {
+                    unset($data[$key]);
                 }
             }
             
@@ -462,30 +468,29 @@
             $server = new serverAPI();
             $telegram = new telegramAPI();
             $database = new Database();
-
             $currenciesConfig = [];
             $changes = [];
             $pricesUpdate = [];
-
-            $tickersPrice = $this->getTickersPrice();
             $prices = [];
-            foreach ($tickersPrice as $tickerPrice) {
-                $prices[$tickerPrice->symbol] = $tickerPrice->price;
-            }
 
             foreach ($server->getCurrenciesConfig() as $currencyConfig) {
                 $currenciesConfig[$currencyConfig->symbol] = $currencyConfig;
+            }
+
+            foreach ($this->getTickersPrice() as $tickerPrice) {
+                $prices[$tickerPrice->symbol] = $tickerPrice->price;
             }
 
             foreach ($trading as $coin) {
                 $currentPrice = $prices[$coin['currency']];
                 
                 $change = number_format((($currentPrice*100)/$coin['currency_price']) - 100, 2);
-                $changes[$coin['currency'].'-'.$coin['id']] = $change;
+                $changes[$coin['id']] = $change;
                 
                 $priceUpdate = false;
-                if (isset($oldPrices[$coin['currency'].'-'.$coin['id']])) {
-                    if ($currentPrice != $oldPrices[$coin['currency'].'-'.$coin['id']]) {
+                
+                if (isset($oldPrices[$coin['id']])) {
+                    if ($currentPrice != $oldPrices[$coin['id']]) {
                         $priceUpdate = true;
                     }
                 }
@@ -495,17 +500,17 @@
                     $telegram->symbolPriceUpdate($currentPrice, $coin['msg_id'], $gain);
                 }
 
-                $pricesUpdate[$coin['currency'].'-'.$coin['id']] = $currentPrice;
+                $pricesUpdate[$coin['id']] = $currentPrice;
 
-                if (isset($oldChanges[$coin['currency'].'-'.$coin['id']])) {
+                if (isset($oldChanges[$coin['id']])) {
                     $currencyConfig = $currenciesConfig[$coin['currency']];
                     $sell_up = $currencyConfig->ratio_sell;
                     $sell_down = $currencyConfig->execution_sell;
 
-                    if ($oldChanges[$coin['currency'].'-'.$coin['id']] >= $sell_up && $change - $oldChanges[$coin['currency'].'-'.$coin['id']] < 0) {
-                        $changes[$coin['currency'].'-'.$coin['id']] = $oldChanges[$coin['currency'].'-'.$coin['id']];
+                    if ($oldChanges[$coin['id']] >= $sell_up && $change - $oldChanges[$coin['id']] < 0) {
+                        $changes[$coin['id']] = $oldChanges[$coin['id']];
 
-                        if ($change - $oldChanges[$coin['currency'].'-'.$coin['id']] <= ($sell_down - (2*$sell_down))) {
+                        if ($change - $oldChanges[$coin['id']] <= ($sell_down - (2*$sell_down))) {
                             $this->salesOrder($coin['users'], $coin['currency'], $currentPrice);
                             $database->sellCoin($coin['id'], $currentPrice);
                             $telegram->deleteMsg($coin['msg_id']);
