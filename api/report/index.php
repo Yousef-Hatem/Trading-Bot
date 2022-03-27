@@ -6,10 +6,13 @@ header("Access-Control-Allow-Methods: GET");
 header("Access-Control-Allow-Headers: AT-KEY, Origin, X-Requested-With, Content-Type, Accept, Access-Control-Request-Method, Access-Control-Allow-Origin");
 
 include_once '../../config.php';
-include_once '../../php/api/telegram.php';
+include_once '../../php/functions.php';
+include_once '../../php/database/main.php';
+include_once '../../php/api/config.php';
 include_once '../../php/api/functions.php';
 include_once '../../php/api/server.php';
-include_once '../../php/database/main.php';
+include_once '../../php/api/telegram.php';
+include_once '../../php/api/binance.php';
 
 function report()
 {

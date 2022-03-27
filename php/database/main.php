@@ -182,6 +182,7 @@
         {
             $report = [];
             $server = new serverAPI();
+            $binance = new binanceAPI();
             
             if ($type == "sell") {
                 $orders = $this->getOrders();
@@ -216,9 +217,16 @@
                                 $i = array_search($user->username, $order['users'], true);
     
                                 if (($i === 0 || $i > 0) && $symbol['symbol'] == $order['currency']) {
+                                    $takerCommission = $binance->tradeFees($user, $order['currency'])[0]->takerCommission;
+                                    $size = ($user->budget_coin/30)/$order['currency_price'];
+                                    $fee = $takerCommission * $size;
+                                    $size = $size - $fee;
+                                    $size = $binance->symbolSizeFormat($order['currency'], $size);
+
                                     $grid = [
                                         'grid' => $order['grid'],
                                         'earning' => number_format(((($user->budget_coin/30)/$order['currency_price']) * $order['sales']['current_price']) - ($user->budget_coin/30), 4),
+                                        'size' => $size,
                                         'selling_price' => $order['sales']['current_price'],
                                         'date' => $order['sales']['date']
                                     ];
@@ -244,10 +252,17 @@
                         $i = array_search($user->username, $trade['users'], true);
     
                         if (($i === 0 || $i > 0)) {
+                            $takerCommission = $binance->tradeFees($user, $trade['currency'])[0]->takerCommission;
+                            $size = ($user->budget_coin/30)/$trade['currency_price'];
+                            $fee = $takerCommission * $size;
+                            $size = $size - $fee;
+                            $size = $binance->symbolSizeFormat($trade['currency'], $size);
+
                             $openTrade = [
                                 'symbol' => $trade['currency'],
                                 'grid' => $trade['grid'],
                                 'price' => $trade['currency_price'],
+                                'size' => $size,
                                 'amount_buy' => $user->budget_coin/30,
                                 'date' => $trade['date']
                             ];
