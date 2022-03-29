@@ -111,15 +111,15 @@ URL: '.$URL;
 
         public function getUpdates()
         {
-            $database = new Database();
-            $request = $this->request('/getUpdates', null, false, null, $database->getUpdateID() + 1);
+            $services = new Services();
+            $request = $this->request('/getUpdates', null, false, null, $services->getUpdateID() + 1);
 
             if (isset($request->result)) {
                 $result = $request->result;
                 $count = count($result);
 
                 if ($count) {
-                    $database->updateID($result[$count-1]->update_id);
+                    $services->editUpdateID($result[$count-1]->update_id);
                     if ($result[$count-1]->message) {
                         return $result[$count-1]->message;
                     }
@@ -129,49 +129,165 @@ URL: '.$URL;
             return false;
         }
 
+        public function question($text, $name)
+        {
+            switch ($text) {
+                case 'Bot':
+                    $text = "I'm with you {$name}";
+                    break;
+
+                case 'Are you with me':
+                    $text = "Yes with you {$name}";
+                    break;
+
+                case 'السلام عليكم':
+                case 'السلام عليكم ورحمة الله و بركاته':
+                    $text = "وعليكم السلام ورحمة الله و بركاته";
+                    break;
+                    
+                case 'Welcome':
+                case 'Hello Bot':
+                case 'Hello':
+                case 'Hi':
+                    $text = "Hello {$name}";
+                    break;
+
+                case 'How are you':
+                    $text = "I am fine thank you for asking";
+                    break;
+
+                case 'Edit chat id':
+                    $text = "/EDITCHATID";
+                    break;
+                    
+                case 'Thanks':
+                case 'Thank you':
+                case 'Thank you Bot':
+                    $text = "I'm always here for you, that's my job";
+                    break;
+
+                case 'System shutdown':
+                    $text = "/EXIT";
+                    break;
+
+                case '/start':
+                case 'Start':
+                    $text = "/START";
+                    break;
+                    
+                case 'Stop':
+                    $text = "/STOP";
+                    break;
+
+                case 'Help':
+                    $text = `Hello <b>`.$name.`</b>
+You can ask for help at any time
+I'm a bot working here and this system is designed for you.
+
+You can type <b>"Start"</b> to start trading.
+
+If you do not specify the maximum number of grids it will be requested when trading begins by typing <b>"Start"</b>
+
+<b>Maximum grids</b> will be requested when <b>"Start"</b> is used for the first time and must be answered within 30 seconds or the order will be canceled
+
+After completing the "Maximum grids" steps, you can use the following commands
+
+command <b>"Stop"</b>
+You can use this command to stop trading
+It can be run again through the <b>"Start"</b> command normally
+
+command <b>"Edit max grids"</b>
+You can use this command to adjust the maximum number of grids and you must respond within 30 seconds or the request will be canceled
+
+command <b>"Edit chat id"</b>
+You can use this command to transfer the bot to another chat
+The <b>chat id</b> must be answered within 30 seconds or the order will be canceled
+
+command <b>"System shutdown"</b>
+You can use this command to completely shut down the system
+And be careful when using it because you will lose contact with me until the system is turned on again
+It is best to use this command in case of emergency
+
+command <b>"Who programmed you"</b>
+You can use this command to find out the developer data
+If there is any problem, you can contact him
+
+You can use the following commands to make sure that the robot works without any problems, and they are commands that do not affect the system at all
+Commands:
+Bot - Hi - Hello Bot - Welcome - Are you with me - Hello - How are you - Thanks - Thank you - Thank you Bot
+
+These are the commands that you can only send
+
+If you need any help. Anytime, I'll be with you`;
+                    break;
+
+                case 'Who programmed you':
+                    $text = `Name: <b>Yousef Hatem</b>
+
+Email: <b>yousef26hatem@gmail.com</b>
+Phone Number: <b>+201146635939</b>
+<a href="https://t.me/Yousef26Hatem">Telegram</a> - <a href="https://github.com/Yousef-Hatem">GitHub</a>`;
+                    break;
+                    
+                case 'Edit max grids':
+                    $text = "/EDITMAXGRIDS";
+                    break;
+                
+                default:
+                    $text = false;
+                    break;
+            }
+
+            return $text;
+        }
+
         public function reply()
         {
             global $max_grids, $chat_id;
 
-            $database = new Database();
+            $services = new Services();
             $msg = $this->getUpdates();
+            
+            if (isset($msg->text)) 
+            {
+                $name = $msg->from->first_name;
 
-            if (isset($msg->text)) {
-                if ($msg->chat->id == $chat_id) {
+                if ($msg->chat->id == $chat_id) 
+                {
                     $text = explode('#', $msg->text);
-                    $answer = $database->question($text[0]);
+                    $answer = $this->question($text[0], $name);
                     if ($answer) {
                         switch ($answer) {
                             case '/START':
-                                $user = $database->getSettings();
+                                $settings = $services->getSettings();
 
-                                if (is_null($user['max_grids'])) {
+                                if (is_null($settings->max_grids)) {
                                     $this->sendMsg('Please send the maximum number of Grids', false);
                                     sleep(30);
                                     $reply = $this->getUpdates();
                                     if (isset($reply->text)) {
-                                        $user['max_grids'] = $reply->text;
+                                        $settings->max_grids = $reply->text;
                                     } else {
                                         return $this->sendMsg('Time out, please try again', false);
                                     }
     
-                                    $database->updateSettings($user['bot_key'], $user['chat_id'], $user['max_grids']);
+                                    $services->editSettings($settings->bot_key, $settings->chat_id, $settings->max_grids);
     
-                                    $max_grids = $user['max_grids'];
+                                    $max_grids = $settings->max_grids;
                                     $reply = null;
                                 }
     
-                                $database->editStatus(1);
+                                $services->editStatus(1);
                                 $reply = "🤖 I started trading now";
                                 break;
     
                             case '/STOP':
-                                $database->editStatus(0);
+                                $services->editStatus(0);
                                 $reply = "🤖 Trading suspended";
                                 break;
     
                             case '/EXIT':
-                                $this->sendMsg('Present Herly the system has stopped');
+                                $this->sendMsg("Present {$name} the system has stopped");
                                 exit();
                                 break;
     
@@ -180,21 +296,21 @@ URL: '.$URL;
                                 break;
     
                             case '/EDITMAXGRIDS':
-                                $user = $database->getSettings();
+                                $settings = $services->getSettings();
     
-                                if (isset($user['max_grids'])) {
+                                if (isset($settings->max_grids)) {
                                     $this->sendMsg('Please send the maximum number of Grids', false);
                                     sleep(30);
                                     $reply = $this->getUpdates();
                                     if (isset($reply->text)) {
-                                        $user['max_grids'] = $reply->text;
+                                        $settings->max_grids = $reply->text;
                                     } else {
                                         return $this->sendMsg('Time out, please try again', false);
                                     }
     
-                                    $database->updateSettings($user['bot_key'], $user['chat_id'], $user['max_grids']);
+                                    $services->editSettings($settings->bot_key, $settings->chat_id, $settings->max_grids);
     
-                                    $max_grids = $user['max_grids'];
+                                    $max_grids = $settings->max_grids;
                                     $reply = "The maximum number of Grids has changed";
                                 } else {
                                     $reply = 'The maximum number of Grids to modify is not specified. Please use "Start" to register the maximum number';
@@ -202,21 +318,21 @@ URL: '.$URL;
                                 break;
 
                             case '/EDITCHATID':
-                                $user = $database->getSettings();
+                                $settings = $services->getSettings();
     
                                 $this->sendMsg('Please send a chat id', false);
                                 sleep(30);
                                 $reply = $this->getUpdates();
                                 if (isset($reply->text)) {
-                                    $user['chat_id'] = $reply->text;
+                                    $settings->chat_id = $reply->text;
                                 } else {
                                     return $this->sendMsg('Time out, please try again', false);
                                 }
 
-                                $database->updateSettings($user['bot_key'], $user['chat_id'], $user['max_grids']);
+                                $services->editSettings($settings->bot_key, $settings->chat_id, $settings->max_grids);
 
                                 $this->sendMsg('Chat id has changed', false);
-                                $chat_id = $user['chat_id'];
+                                $chat_id = $settings->chat_id;
                                 $this->sendMsg('I will be here with you now', false);
                                 $reply = null;
                                 break;
@@ -233,14 +349,12 @@ URL: '.$URL;
                                 break;
                         }
                     } else {
-                        $reply = "Sorry Herly, I don't understand you";
+                        $reply = "Sorry {$name}, I don't understand you";
                     }
             
                     if (isset($reply)) {
                         $this->sendMsg($reply, false, $msg->message_id);
                     }
-                } else {
-                    printCmd($msg, 'msg');
                 }
             }
         }

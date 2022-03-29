@@ -7,7 +7,7 @@
             $telegram = new telegramAPI();
 
             $url = "http://207.148.65.66/api".$route;
-            $headers = ["YB-KEY: ". "OWQrOWtkS1ltK3grYTFNV2VZSTRzZz09"];
+            $headers = ["YB-KEY: ". AT_KEY];
 
             $request = $API->curlGet($url, $headers);
 
@@ -16,11 +16,10 @@
                     return $request;
                 }
                 
-                $telegram->sendError($request->error, $route);
+                $telegram->sendError($request->message, $url);
                 return false;
             } else {
-                printCmd($request, 'server request');
-                return false;
+                return $this->request($route);
             }
 
         }

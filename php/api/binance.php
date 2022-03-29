@@ -40,7 +40,7 @@
             }
             
             isset($API_SECRET)? $route = $route.'?'.$data."&signature=".$this->signature($data, $API_SECRET): $route = $route.'?'.$data;
-            $url = API_URL . $route;
+            $url = "https://api.binance.com" . $route;
 
             switch ($method) {
                 case 'GET':
@@ -68,7 +68,7 @@
                         if ($data->code == -1021) {
                             $this->request($route, $timestamp, $API_SECRET, $API_KEY, $parameters, $method);
                         } else {
-                            $telegram->sendError($data->code.': '.$data->msg, $route);
+                            $telegram->sendError($data->code.': '.$data->msg, $url);
                         }
                     }
                     printCmd("({$data->code}) {$data->msg} \n URL: {$route}", "Error");
@@ -90,7 +90,7 @@
         {
             $API = new API();
 
-            $request = $API->curlGet(API_URL . "/api/v3/time");
+            $request = $API->curlGet("https://api.binance.com/api/v3/time");
 
             if (isset($request->serverTime)) {
                 return $request->serverTime;
@@ -207,13 +207,13 @@
             }
 
             if ($total) {
-                $database = new Database();
-                $trading = $database->isTrading();
+                $services = new Services();
+                $trading = $services->isTrading();
                 foreach ($trading as $symbol) {
-                    $index = array_search($user->username, $symbol['users'], true);
-                    
-                    if (($index === 0 || $index > 0)) {
-                        $request->total += $user->budget_coin/30;
+                    foreach ($symbol->users as $usersTrading) {                        
+                        if ($user->username == $usersTrading->username) {
+                            $request->total += ($usersTrading->size * $symbol['price']);
+                        }
                     }
                 }
             }
@@ -267,21 +267,21 @@
             $index = array_search($symbol, $userCoins, true);
 
             if (($index === 0 || $index > 0)) {
-                $database = new Database();
+                $services = new Services();
 
                 $coins = [];
                 $numberDeals = 0;
 
-                foreach ($database->isTrading() as $trading) {
-                    $index = array_search($user->username, $trading['users'], true);
-
-                    if (($index === 0 || $index > 0)) {
-                        if ($trading['currency'] == $symbol) {
-                            $numberDeals++;
-                        }
-                        $i = array_search($symbol, $coins, true);
-                        if (!($i === 0 || $i > 0)) {
-                            array_push($coins, $symbol);
+                foreach ($services->isTrading() as $trading) {
+                    foreach ($trading->users as $userTrading) {
+                        if ($user->username == $userTrading->username) {
+                            if ($trading->symbol == $symbol) {
+                                $numberDeals++;
+                            }
+                            $i = array_search($symbol, $coins, true);
+                            if (!($i === 0 || $i > 0)) {
+                                array_push($coins, $symbol);
+                            }
                         }
                     }
                 }
@@ -312,7 +312,7 @@
         {
             $server = new serverAPI();
             $telegram = new telegramAPI();
-            $database = new Database();
+            $services = new Services();
 
             $users = [];
             $symbolPrice = $this->getTickersPrice($symbol)->price;
@@ -328,14 +328,13 @@
                 if ($this->permissionBuy($user, $symbol)) {
                     $funds = $user->budget_coin/30;
                     
-                    if ($exchangeInfo->symbols[0]->quoteOrderQtyMarketAllowed) {
-                        $body['quoteOrderQty'] = $funds;
-                    } else {
-                        $size = $this->symbolSizeFormat($symbol, $funds/$symbolPrice, $exchangeInfo->symbols[0]->filters);
-                        $body['quantity'] = $size;
-                    }
+                    $size = $this->symbolSizeFormat($symbol, $funds/$symbolPrice, $exchangeInfo->symbols[0]->filters);
+                    $body['quantity'] = $size;
 
-                    array_push($users, $user->username);
+                    array_push($users, [
+                        'username' => $user->username,
+                        'size' => $size
+                    ]);
 
                     if (Production) {
                         $this->request('/api/v3/order', true, $user->secret_key, $user->api_key, $body, 'POST');
@@ -348,7 +347,7 @@
             if (count($users)) {
                 $telegram->sendBuy($symbol, $symbolPrice);
                 $msgID = $telegram->symbolPriceUpdate($symbolPrice, false)->result->message_id;
-                $database->buyCoin($symbol, $symbolPrice, $msgID, $users);
+                $services->buyCoin($symbol, $symbolPrice, $msgID, $users);
             }
 
             return true;
@@ -388,8 +387,8 @@
         public function perfectSymbols($oldChanges = null, $max)
         {
             $server = new serverAPI();
-            $database = new Database();
-            $trades = $database->isTrading();
+            $services = new Services();
+            $trades = $services->isTrading();
             $currencies = [];
             $coins = [];
             $data = [];
@@ -399,8 +398,8 @@
                 $price = $currency->price_highest;
 
                 foreach ($trades as $trade) {
-                    if ($trade['currency'] == $currency->symbol) {
-                        $price = $trade['currency_price'];
+                    if ($trade->symbol == $currency->symbol) {
+                        $price = $trade->price;
                     }
                 }
 
@@ -467,7 +466,7 @@
         {
             $server = new serverAPI();
             $telegram = new telegramAPI();
-            $database = new Database();
+            $services = new Services();
             $currenciesConfig = [];
             $changes = [];
             $pricesUpdate = [];
@@ -512,7 +511,7 @@
 
                         if ($change - $oldChanges[$coin['id']] <= ($sell_down - (2*$sell_down))) {
                             $this->salesOrder($coin['users'], $coin['currency'], $currentPrice);
-                            $database->sellCoin($coin['id'], $currentPrice);
+                            $services->sellCoin($coin['id'], $currentPrice);
                             $telegram->deleteMsg($coin['msg_id']);
                             $telegram->sendSell($coin['currency'], $currentPrice);
                         }

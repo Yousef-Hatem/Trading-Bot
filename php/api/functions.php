@@ -16,12 +16,16 @@
 
             if ($method === "POST") {
                 curl_setopt($state_ch, CURLOPT_POST, true);
-
+                
                 if (count($body)) {
                     $body = json_encode($body);
     
-                    curl_setopt($state_ch,CURLOPT_POSTFIELDS, $body);
+                    curl_setopt($state_ch, CURLOPT_POSTFIELDS, $body);
                 }
+            }
+
+            if ($method === "PUT") {
+                curl_setopt($state_ch, CURLOPT_PUT, true);
             }
 
             if ($method === "DELETE") {
@@ -31,7 +35,7 @@
             if ($headers) {
                 curl_setopt($state_ch, CURLOPT_HTTPHEADER, $headers);
             }
-
+            
             $state_result = curl_exec($state_ch);
 
             if (is_string($proxy) && $proxy != "main") {
@@ -51,6 +55,11 @@
         public function curlPost($url, $headers = false, $body = [], $proxy = null) 
         {
             return $this->curl($url, "POST", $headers, $body, $proxy);
+        }
+
+        public function curlPut($url, $headers = false, $proxy = null) 
+        {
+            return $this->curl($url, "PUT", $headers, [], $proxy);
         }
 
         public function curlDelete($url, $headers = false, $proxy = null)

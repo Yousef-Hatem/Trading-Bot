@@ -1,14 +1,14 @@
 <?php
 
-$database = new Database();
+$services = new Services();
 
-$settings = $database->getSettings();
+$settings = $services->getSettings();
 
-$bot_key = $settings['bot_key'];
+$bot_key = $settings->bot_key;
 
-$chat_id = $settings['chat_id'];
+$chat_id = $settings->chat_id;
 
-$max_grids = $settings['max_grids'];
+$max_grids = $settings->max_grids;
 
 $proxys = [
     [

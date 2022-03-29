@@ -12,13 +12,13 @@ function trade()
     global $changes, $prices, $max_grids;
     $time = time();
 
-    $database = new Database();
+    $services = new Services();
     $telegram = new telegramAPI();
     
-    if ($database->getStatus()) {
+    if ($services->getStatus()) {
         $binance = new binanceAPI();
 
-        $trading = $database->isTrading();
+        $trading = $services->isTrading();
         
         $data = $binance->isSellCoin($trading, $changes['sell'], $prices);
         $changes['sell'] = $data['changes'];

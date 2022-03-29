@@ -1,15 +1,10 @@
 <?php
 
-define("Production", true);
+define("Production", false);
 
-define("DATABASE", [
-    'SERVERNAME' => 'localhost',
-    'USERNAME' => 'root',
-    'PASSWORD' => '',
-    'DB' => 'automated_trading'
-]);
+define('SERVICES_API_URL', 'http://automated-trading.test/api');
 
-define('API_URL', 'https://api.binance.com');
+define('AT_KEY', 'OWQrOWtkS1ltK3grYTFNV2VZSTRzZz09');
 
 define('Proxys', [
     
