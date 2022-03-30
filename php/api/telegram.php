@@ -180,35 +180,35 @@ URL: '.$URL;
                     break;
 
                 case 'Help':
-                    $text = `Hello <b>`.$name.`</b>
+                    $text = "Hello <b>`.$name.`</b>
 You can ask for help at any time
 I'm a bot working here and this system is designed for you.
 
-You can type <b>"Start"</b> to start trading.
+You can type <b>\"Start\"</b> to start trading.
 
-If you do not specify the maximum number of grids it will be requested when trading begins by typing <b>"Start"</b>
+If you do not specify the maximum number of grids it will be requested when trading begins by typing <b>\"Start\"</b>
 
-<b>Maximum grids</b> will be requested when <b>"Start"</b> is used for the first time and must be answered within 30 seconds or the order will be canceled
+<b>Maximum grids</b> will be requested when <b>\"Start\"</b> is used for the first time and must be answered within 30 seconds or the order will be canceled
 
-After completing the "Maximum grids" steps, you can use the following commands
+After completing the \"Maximum grids\" steps, you can use the following commands
 
-command <b>"Stop"</b>
+command <b>\"Stop\"</b>
 You can use this command to stop trading
-It can be run again through the <b>"Start"</b> command normally
+It can be run again through the <b>\"Start\"</b> command normally
 
-command <b>"Edit max grids"</b>
+command <b>\"Edit max grids\"</b>
 You can use this command to adjust the maximum number of grids and you must respond within 30 seconds or the request will be canceled
 
-command <b>"Edit chat id"</b>
+command <b>\"Edit chat id\"</b>
 You can use this command to transfer the bot to another chat
 The <b>chat id</b> must be answered within 30 seconds or the order will be canceled
 
-command <b>"System shutdown"</b>
+command <b>\"System shutdown\"</b>
 You can use this command to completely shut down the system
 And be careful when using it because you will lose contact with me until the system is turned on again
 It is best to use this command in case of emergency
 
-command <b>"Who programmed you"</b>
+command <b>\"Who programmed you\"</b>
 You can use this command to find out the developer data
 If there is any problem, you can contact him
 
@@ -218,15 +218,15 @@ Bot - Hi - Hello Bot - Welcome - Are you with me - Hello - How are you - Thanks 
 
 These are the commands that you can only send
 
-If you need any help. Anytime, I'll be with you`;
+If you need any help. Anytime, I'll be with you";
                     break;
 
                 case 'Who programmed you':
-                    $text = `Name: <b>Yousef Hatem</b>
+                    $text = 'Name: <b>Yousef Hatem</b>
 
 Email: <b>yousef26hatem@gmail.com</b>
 Phone Number: <b>+201146635939</b>
-<a href="https://t.me/Yousef26Hatem">Telegram</a> - <a href="https://github.com/Yousef-Hatem">GitHub</a>`;
+<a href="https://t.me/Yousef26Hatem">Telegram</a> - <a href="https://github.com/Yousef-Hatem">GitHub</a>';
                     break;
                     
                 case 'Edit max grids':

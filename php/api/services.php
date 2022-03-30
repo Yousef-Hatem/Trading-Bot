@@ -44,9 +44,7 @@
             } elseif ($method == "PUT") {
                 return true;
             } else {
-                printCmd($route, 'route');
-                printCmd($method, 'method');
-                return "Error";
+                return $this->request($route, $method, $body);
             }
 
         }

@@ -354,24 +354,25 @@
         }
 
 
-        public function salesOrder($usersname, $currency, $currentPrice)
+        public function salesOrder($users, $currency)
         {
             $server = new serverAPI();
+            $sizes = [];
 
-            foreach ($server->getUsers() as $user) {
-                $index = array_search($user->username, $usersname, true);
-                    
-                if (($index === 0 || $index > 0)) {
-                    $takerCommission = $this->tradeFees($user, $currency)[0]->takerCommission;
-                    $size = ($user->budget_coin/30)/$currentPrice;
-                    $fee = $takerCommission * $size;
-                    $size = $size - $fee;
-                    $size = $this->symbolSizeFormat($currency, $size);
+            foreach ($users as $user) 
+            {
+                $sizes[$user->username] = $user->size;
+            }
+
+            foreach ($server->getUsers() as $user) 
+            {                    
+                if (isset($sizes[$user->username])) 
+                {
                     $body = [
                         "symbol" => $currency,
                         "side" => "sell",
                         "type" => "market",
-                        "quantity" => $size
+                        "quantity" => $sizes[$user->username]
                     ];
         
                     if (Production) {
@@ -397,7 +398,8 @@
             foreach ($server->getCurrenciesConfig() as $currency) {
                 $price = $currency->price_highest;
 
-                foreach ($trades as $trade) {
+                foreach ($trades as $trade) 
+                {
                     if ($trade->symbol == $currency->symbol) {
                         $price = $trade->price;
                     }
@@ -481,39 +483,39 @@
             }
 
             foreach ($trading as $coin) {
-                $currentPrice = $prices[$coin['currency']];
+                $currentPrice = $prices[$coin->symbol];
                 
-                $change = number_format((($currentPrice*100)/$coin['currency_price']) - 100, 2);
-                $changes[$coin['id']] = $change;
+                $change = number_format((($currentPrice*100)/$coin->price) - 100, 2);
+                $changes[$coin->id] = $change;
                 
                 $priceUpdate = false;
                 
-                if (isset($oldPrices[$coin['id']])) {
-                    if ($currentPrice != $oldPrices[$coin['id']]) {
+                if (isset($oldPrices[$coin->id])) {
+                    if ($currentPrice != $oldPrices[$coin->id]) {
                         $priceUpdate = true;
                     }
                 }
 
                 if ($priceUpdate) {
-                    $gain = (($currentPrice/$coin['currency_price'])*100)-100;
-                    $telegram->symbolPriceUpdate($currentPrice, $coin['msg_id'], $gain);
+                    $gain = (($currentPrice/$coin->price)*100)-100;
+                    $telegram->symbolPriceUpdate($currentPrice, $coin->msg_id, $gain);
                 }
 
-                $pricesUpdate[$coin['id']] = $currentPrice;
+                $pricesUpdate[$coin->id] = $currentPrice;
 
-                if (isset($oldChanges[$coin['id']])) {
-                    $currencyConfig = $currenciesConfig[$coin['currency']];
+                if (isset($oldChanges[$coin->id])) {
+                    $currencyConfig = $currenciesConfig[$coin->symbol];
                     $sell_up = $currencyConfig->ratio_sell;
                     $sell_down = $currencyConfig->execution_sell;
 
-                    if ($oldChanges[$coin['id']] >= $sell_up && $change - $oldChanges[$coin['id']] < 0) {
-                        $changes[$coin['id']] = $oldChanges[$coin['id']];
+                    if ($oldChanges[$coin->id] >= $sell_up && $change - $oldChanges[$coin->id] < 0) {
+                        $changes[$coin->id] = $oldChanges[$coin->id];
 
-                        if ($change - $oldChanges[$coin['id']] <= ($sell_down - (2*$sell_down))) {
-                            $this->salesOrder($coin['users'], $coin['currency'], $currentPrice);
-                            $services->sellCoin($coin['id'], $currentPrice);
-                            $telegram->deleteMsg($coin['msg_id']);
-                            $telegram->sendSell($coin['currency'], $currentPrice);
+                        if ($change - $oldChanges[$coin->id] <= ($sell_down - (2*$sell_down))) {
+                            $this->salesOrder($coin->users, $coin->symbol);
+                            $services->sellCoin($coin->id, $currentPrice);
+                            $telegram->deleteMsg($coin->msg_id);
+                            $telegram->sendSell($coin->symbol, $currentPrice);
                         }
                     }
                 }
