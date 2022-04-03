@@ -210,9 +210,9 @@
                 $services = new Services();
                 $trading = $services->isTrading();
                 foreach ($trading as $symbol) {
-                    foreach ($symbol->users as $usersTrading) {                        
+                    foreach (json_decode($symbol->users) as $usersTrading) {                        
                         if ($user->username == $usersTrading->username) {
-                            $request->total += ($usersTrading->size * $symbol['price']);
+                            $request->total += ($usersTrading->size * $symbol->price);
                         }
                     }
                 }
@@ -273,7 +273,7 @@
                 $numberDeals = 0;
 
                 foreach ($services->isTrading() as $trading) {
-                    foreach ($trading->users as $userTrading) {
+                    foreach (json_decode($trading->users) as $userTrading) {
                         if ($user->username == $userTrading->username) {
                             if ($trading->symbol == $symbol) {
                                 $numberDeals++;
@@ -331,16 +331,16 @@
                     $size = $this->symbolSizeFormat($symbol, $funds/$symbolPrice, $exchangeInfo->symbols[0]->filters);
                     $body['quantity'] = $size;
 
-                    array_push($users, [
-                        'username' => $user->username,
-                        'size' => $size
-                    ]);
-
                     if (Production) {
                         $this->request('/api/v3/order', true, $user->secret_key, $user->api_key, $body, 'POST');
                     } else {
                         $this->request('/api/v3/order/test', true, $user->secret_key, $user->api_key, $body, 'POST');
                     }
+
+                    array_push($users, [
+                        'username' => $user->username,
+                        'size' => $size
+                    ]);
                 }
             }
 
@@ -365,7 +365,7 @@
             }
 
             foreach ($server->getUsers() as $user) 
-            {                    
+            {
                 if (isset($sizes[$user->username])) 
                 {
                     $body = [
@@ -512,7 +512,7 @@
                         $changes[$coin->id] = $oldChanges[$coin->id];
 
                         if ($change - $oldChanges[$coin->id] <= ($sell_down - (2*$sell_down))) {
-                            $this->salesOrder($coin->users, $coin->symbol);
+                            $this->salesOrder(json_decode($coin->users), $coin->symbol);
                             $services->sellCoin($coin->id, $currentPrice);
                             $telegram->deleteMsg($coin->msg_id);
                             $telegram->sendSell($coin->symbol, $currentPrice);
