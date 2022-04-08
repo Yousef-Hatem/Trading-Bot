@@ -231,7 +231,7 @@
         }
 
 
-        public function userCoins($user)
+        public function userCoins($user, $symbolsPrices)
         {
             $server = new serverAPI();
             $currenciesConfig = $server->getCurrenciesConfig();
@@ -244,7 +244,7 @@
                     if (isset($coin)) {
                         $index = array_search($currencyConfig->symbol, $coins, true);
 
-                        if (!($index === 0 || $index > 0)) {
+                        if (!($index === 0 || $index > 0) && $currencyConfig->price_highest > $symbolsPrices[$currencyConfig->symbol]) {
                             if ($currencyConfig->price_highest < $coin->price_highest) {
                                 $coin = $currencyConfig;
                             }
@@ -261,9 +261,10 @@
         }
 
 
-        public function permissionBuy($user, $symbol)
+        public function permissionBuy($user, $symbol, $symbolsPrices)
         {
-            $userCoins = $this->userCoins($user);
+            $userCoins = $this->userCoins($user, $symbolsPrices);
+            printCmd($userCoins);
             $index = array_search($symbol, $userCoins, true);
 
             if (($index === 0 || $index > 0)) {
@@ -310,12 +311,17 @@
 
         public function newOrder($symbol)
         {
+            printCmd(1);
             $server = new serverAPI();
             $telegram = new telegramAPI();
             $services = new Services();
-
             $users = [];
-            $symbolPrice = $this->getTickersPrice($symbol)->price;
+
+            $symbolsPrices = [];
+            foreach ($this->getTickersPrice() as $tickerPrice) {
+                $symbolsPrices[$tickerPrice->symbol] = $tickerPrice->price;
+            }
+
             $exchangeInfo = $this->exchangeInfo($symbol);
             $body = [
                 "symbol" => $symbol,
@@ -325,10 +331,10 @@
 
             
             foreach ($server->getUsers() as $user) {
-                if ($this->permissionBuy($user, $symbol)) {
+                if ($this->permissionBuy($user, $symbol, $symbolsPrices)) {
                     $funds = $user->budget_coin/30;
                     
-                    $size = $this->symbolSizeFormat($symbol, $funds/$symbolPrice, $exchangeInfo->symbols[0]->filters);
+                    $size = $this->symbolSizeFormat($symbol, $funds/$symbolsPrices[$symbol], $exchangeInfo->symbols[0]->filters);
                     $body['quantity'] = $size;
 
                     if (Production) {
@@ -345,9 +351,9 @@
             }
 
             if (count($users)) {
-                $telegram->sendBuy($symbol, $symbolPrice);
-                $msgID = $telegram->symbolPriceUpdate($symbolPrice, false)->result->message_id;
-                $services->buyCoin($symbol, $symbolPrice, $msgID, $users);
+                $telegram->sendBuy($symbol, $symbolsPrices[$symbol]);
+                $msgID = $telegram->symbolPriceUpdate($symbolsPrices[$symbol], false)->result->message_id;
+                $services->buyCoin($symbol, $symbolsPrices[$symbol], $msgID, $users);
             }
 
             return true;
