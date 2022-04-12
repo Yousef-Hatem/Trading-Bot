@@ -65,14 +65,36 @@
             return true;
         }
 
-        public function sendError($msg, $URL)
+        public function sendError($data, $route, $user)
         {
-            
-            $msg = "<b>🤖 Something went wrong during my work ❌</b>
+            $r = explode('?', $route);
 
-Error: ".$msg.'
+            switch ($r[0]) {
+                case '/api/v3/order':
+                case '/api/v3/order/test':
+                    $side = explode('&', explode('&side=', $r[1])[1])[0];
 
-URL: '.$URL;
+                    if ($side == "buy") {
+                        $failure = "the purchase order";
+                    } else {
+                        $failure = "the sell order";
+                    }
+                    break;
+
+                case '/sapi/v1/asset/tradeFee':
+                    $failure = "obtain the fee";
+                    break;
+
+                case '/api/v3/account':
+                    $failure = "obtain the balance";
+                    break;
+
+                default:
+                    $failure = $r[0];
+                    break;
+            }
+
+            $msg = "🤖 <b>An error occurred ❌ and {$failure}</b> for the user <b>\"{$user->username}\"</b> failed due to <b>{$data->msg}</b>";
             
             $this->sendMsg($msg, false);
 

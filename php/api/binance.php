@@ -2,7 +2,7 @@
 
     class binanceAPI {
 
-        public function request($route, $timestamp = false, $API_SECRET = null, $API_KEY = null, $parameters = [], $method = 'GET')
+        public function request($route, $timestamp = false, $user = null, $parameters = [], $method = 'GET')
         {
             global $proxys;
             $proxy = null;
@@ -27,8 +27,8 @@
             $timestamp? $parameters['timestamp'] = $this->timestamp(): '';
             $headers = [sprintf("Content-Type: %s", "application/json")];
 
-            if (isset($API_KEY)) {
-                array_push($headers, "X-MBX-APIKEY: ". $API_KEY);
+            if (isset($user)) {
+                array_push($headers, "X-MBX-APIKEY: ". $user->api_key);
             }
 
             foreach ($parameters as $key => $value) {
@@ -39,7 +39,7 @@
                 }
             }
             
-            isset($API_SECRET)? $route = $route.'?'.$data."&signature=".$this->signature($data, $API_SECRET): $route = $route.'?'.$data;
+            isset($user)? $route = $route.'?'.$data."&signature=".$this->signature($data, $user->secret_key): $route = $route.'?'.$data;
             $url = "https://api.binance.com" . $route;
 
             switch ($method) {
@@ -59,16 +59,15 @@
             }
 
             if (is_string($data)) {
-                $telegram->sendError($data, $url);
                 printCmd("\n $data \n URL: {$route} \n", "Error");
                 return false;
             } elseif (isset($data->code)) {
                 if ($data->code != 200) {
                     if ($data->code != -2014 && $data->code != -1022) {
                         if ($data->code == -1021) {
-                            $this->request($route, $timestamp, $API_SECRET, $API_KEY, $parameters, $method);
+                            $this->request($route, $timestamp, $user, $parameters, $method);
                         } else {
-                            $telegram->sendError($data->code.': '.$data->msg, $url);
+                            $telegram->sendError($data, $route, $user);
                         }
                     }
                     printCmd("({$data->code}) {$data->msg} \n URL: {$route}", "Error");
@@ -108,7 +107,7 @@
                 $parameter = ['symbol' => $symbol];
             }
 
-            return $this->request("/api/v3/ticker/24hr", false, null, null, $parameter);
+            return $this->request("/api/v3/ticker/24hr", false, null, $parameter);
         }
 
         public function getTickersPrice($symbol = null)
@@ -119,7 +118,7 @@
                 $parameter = ['symbol' => $symbol];
             }
 
-            $tickersPrice = $this->request("/api/v3/ticker/price", false, null, null, $parameter);
+            $tickersPrice = $this->request("/api/v3/ticker/price", false, null, $parameter);
 
             if (is_array($tickersPrice)) {
                 if (count($tickersPrice)) {
@@ -141,7 +140,7 @@
                 $symbols = implode('","', $symbols);
             }
 
-            $request = $this->request("/api/v3/exchangeInfo", false, null, null, [
+            $request = $this->request("/api/v3/exchangeInfo", false, null, [
                 "symbols" => "[\"{$symbols}\"]"
             ]);
 
@@ -173,7 +172,7 @@
                 $symbol = [];
             }
 
-            $request = $this->request("/sapi/v1/asset/tradeFee", true, $user->secret_key, $user->api_key, $symbol);
+            $request = $this->request("/sapi/v1/asset/tradeFee", true, $user, $symbol);
 
             if ($request[0]) {
                 return $request;
@@ -198,7 +197,7 @@
 
         public function getBalance($user, $total)
         {
-            $request = $this->request("/api/v3/account", true, $user->secret_key, $user->api_key);
+            $request = $this->request("/api/v3/account", true, $user);
 
             foreach ($request->balances as $symbol) {
                 if ($symbol->asset == "USDT") {
@@ -264,7 +263,7 @@
         public function permissionBuy($user, $symbol, $symbolsPrices)
         {
             $userCoins = $this->userCoins($user, $symbolsPrices);
-            printCmd($userCoins);
+            printCmd($userCoins, $user->username);
             $index = array_search($symbol, $userCoins, true);
 
             if (($index === 0 || $index > 0)) {
@@ -311,7 +310,6 @@
 
         public function newOrder($symbol)
         {
-            printCmd(1);
             $server = new serverAPI();
             $telegram = new telegramAPI();
             $services = new Services();
@@ -338,15 +336,17 @@
                     $body['quantity'] = $size;
 
                     if (Production) {
-                        $this->request('/api/v3/order', true, $user->secret_key, $user->api_key, $body, 'POST');
+                        $request = $this->request('/api/v3/order', true, $user, $body, 'POST');
                     } else {
-                        $this->request('/api/v3/order/test', true, $user->secret_key, $user->api_key, $body, 'POST');
+                        $request = $this->request('/api/v3/order/test', true, $user, $body, 'POST');
                     }
 
-                    array_push($users, [
-                        'username' => $user->username,
-                        'size' => $size
-                    ]);
+                    if ($request) {
+                        array_push($users, [
+                            'username' => $user->username,
+                            'size' => $size
+                        ]);
+                    }
                 }
             }
 
@@ -382,9 +382,9 @@
                     ];
         
                     if (Production) {
-                        $this->request('/api/v3/order', true, $user->secret_key, $user->api_key, $body, 'POST');
+                        $this->request('/api/v3/order', true, $user, $body, 'POST');
                     } else {
-                        $this->request('/api/v3/order/test', true, $user->secret_key, $user->api_key, $body, 'POST');
+                        $this->request('/api/v3/order/test', true, $user, $body, 'POST');
                     }
                 }
             }
