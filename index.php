@@ -5,11 +5,10 @@ include 'php/master.php';
 welcome();
 
 $changes  = ['buy' => null, 'sell' => []];
-$prices = [];
 
 function trade()
 {
-    global $changes, $prices, $max_grids;
+    global $changes, $max_grids;
     $time = time();
 
     $services = new Services();
@@ -20,9 +19,7 @@ function trade()
 
         $trading = $services->isTrading();
         
-        $data = $binance->isSellCoin($trading, $changes['sell'], $prices);
-        $changes['sell'] = $data['changes'];
-        $prices = $data['prices'];
+        $changes['sell'] = $binance->isSellCoin($trading, $changes['sell']);
             
         if ($max_grids > count($trading)) {
             $changes['buy'] = $binance->perfectSymbols($changes['buy'], $max_grids - count($trading));

@@ -4,10 +4,9 @@
         
         public function request($route, $method = "GET", $body = []) {
             $API = new API();
-            $telegram = new telegramAPI();
 
             $url = SERVICES_API_URL.$route;
-            $headers = [sprintf("Content-Type: %s", "application/json"), "AT-KEY: ". AT_KEY];
+            $headers = [sprintf("Content-Type: %s", "application/json"), "Accept: application/json", "AT-KEY: ". AT_KEY];
 
             switch ($method) {
                 case 'GET':
@@ -30,7 +29,10 @@
 
             if (isset($request->status)) {
                 if (!$request->status) {
-                    $telegram->sendError($request->error, $url);
+                    echo "\n\n";
+                    echo "Error: ".$request->error;
+                    echo "\nURL: ".$url;
+                    echo "\n\n";
                     return false;
                 }
                 
@@ -41,9 +43,24 @@
                 unset($request->status);
                 
                 return $request;
+            } elseif (isset($request->message)) {
+                if ($request->message == "Too Many Attempts") {
+                    sleep(3);
+                    return $this->request($route, $method, $body);
+                }
+                echo "\n\n";
+                echo "Error: ".$request->message;
+                echo "\nURL: ".$url;
+                echo "\n\n";
+                return false;
+
             } elseif ($method == "PUT") {
-                return true;
+                return $request;
             } else {
+                printCmd($route, 'route');
+                printCmd($method, 'method');
+                printCmd($body, 'body');
+                printCmd($request, 'request');
                 return $this->request($route, $method, $body);
             }
 
@@ -69,24 +86,28 @@
             return $this->request("/status/{$status}", 'PUT');
         }
 
-        public function buyCoin($symbol, $price, $msgID, $users)
+        public function buyCoin($symbol, $users)
         {
             return $this->request('/buy', 'POST', [
                 'symbol' => $symbol,
-                'price' => $price,
-                'users' => $users,
-                "msg_id" => $msgID
+                'users' => $users
             ]);
         }
 
-        public function sellCoin($id, $price)
+        public function sellCoin($id, $order)
         {
-            return $this->request("/sell/{$id}?price={$price}", 'PUT');
+            return $this->request("/sell/{$id}?price={$order['price']}&fee={$order['fee']}&sold_at={$order['sold_at']}", 'PUT');
         }
 
         public function isTrading()
         {
-            return $this->request("/trades");
+            $trades = $this->request("/trades");
+
+            if (is_array($trades)) {
+                return $trades;
+            }
+
+            return $this->isTrading();
         }
 
         public function getUpdateID()

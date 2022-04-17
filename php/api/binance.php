@@ -209,10 +209,8 @@
                 $services = new Services();
                 $trading = $services->isTrading();
                 foreach ($trading as $symbol) {
-                    foreach (json_decode($symbol->users) as $usersTrading) {                        
-                        if ($user->username == $usersTrading->username) {
-                            $request->total += ($usersTrading->size * $symbol->price);
-                        }
+                    if ($user->username == $symbol->username) {
+                        $request->total += ($symbol->size * $symbol->price);
                     }
                 }
             }
@@ -230,58 +228,66 @@
         }
 
 
-        public function userCoins($user, $symbolsPrices)
+        public function userCoins($user, $symbolsPrices, $trades, $currenciesConfig)
         {
-            $server = new serverAPI();
-            $currenciesConfig = $server->getCurrenciesConfig();
             $coins = [];
 
-            for ($i=0; $i < $user->total_coin; $i++) { 
-                $coin = null;
+            foreach ($trades as $trade) 
+            {
+                if (count($coins) < $user->total_coin) {
+                    $index = array_search($trade->symbol, $coins, true);
 
-                foreach ($currenciesConfig as $currencyConfig) {
-                    if (isset($coin)) {
-                        $index = array_search($currencyConfig->symbol, $coins, true);
-
-                        if (!($index === 0 || $index > 0) && $currencyConfig->price_highest > $symbolsPrices[$currencyConfig->symbol]) {
-                            if ($currencyConfig->price_highest < $coin->price_highest) {
-                                $coin = $currencyConfig;
-                            }
-                        }
-                    } else {
-                        $coin = $currencyConfig;
+                    if ($trade->username === $user->username && !($index === 0 || $index > 0)) 
+                    {
+                        array_push($coins, $trade->symbol);
                     }
                 }
+            }
 
-                array_push($coins, $coin->symbol);
+            for ($i=0; $i < $user->total_coin; $i++) {
+                if (count($coins) < $user->total_coin) {                
+                    $coin = null;
+
+                    foreach ($currenciesConfig as $currencyConfig) 
+                    {
+                        if (isset($coin)) {
+                            $index = array_search($currencyConfig->symbol, $coins, true);
+
+                            if (!($index === 0 || $index > 0) && $currencyConfig->price_highest > $symbolsPrices[$currencyConfig->symbol]) {
+                                if ($currencyConfig->price_highest < $coin->price_highest) {
+                                    $coin = $currencyConfig;
+                                }
+                            }
+                        } else {
+                            $coin = $currencyConfig;
+                        }
+                    }
+
+                    array_push($coins, $coin->symbol);
+                }
             }
 
             return $coins;
         }
 
 
-        public function permissionBuy($user, $symbol, $symbolsPrices)
+        public function permissionBuy($user, $symbol, $symbolsPrices, $trades, $currenciesConfig)
         {
-            $userCoins = $this->userCoins($user, $symbolsPrices);
-            printCmd($userCoins, $user->username);
+            $userCoins = $this->userCoins($user, $symbolsPrices, $trades, $currenciesConfig);
             $index = array_search($symbol, $userCoins, true);
 
             if (($index === 0 || $index > 0)) {
-                $services = new Services();
-
                 $coins = [];
                 $numberDeals = 0;
 
-                foreach ($services->isTrading() as $trading) {
-                    foreach (json_decode($trading->users) as $userTrading) {
-                        if ($user->username == $userTrading->username) {
-                            if ($trading->symbol == $symbol) {
-                                $numberDeals++;
-                            }
-                            $i = array_search($symbol, $coins, true);
-                            if (!($i === 0 || $i > 0)) {
-                                array_push($coins, $symbol);
-                            }
+                foreach ($trades as $trading) {
+                    if ($user->username == $trading->username) {
+                        if ($trading->symbol == $symbol) {
+                            $numberDeals++;
+                        }
+                        $i = array_search($symbol, $coins, true);
+                        if (!($i === 0 || $i > 0)) {
+                            array_push($coins, $symbol);
                         }
                     }
                 }
@@ -327,9 +333,11 @@
                 "type" => "market"
             ];
 
+            $trades = $services->isTrading();
+            $currenciesConfig = $server->getCurrenciesConfig();
             
             foreach ($server->getUsers() as $user) {
-                if ($this->permissionBuy($user, $symbol, $symbolsPrices)) {
+                if ($this->permissionBuy($user, $symbol, $symbolsPrices, $trades, $currenciesConfig)) {
                     $funds = $user->budget_coin/30;
                     
                     $size = $this->symbolSizeFormat($symbol, $funds/$symbolsPrices[$symbol], $exchangeInfo->symbols[0]->filters);
@@ -342,52 +350,79 @@
                     }
 
                     if ($request) {
+                        $price = $request->cummulativeQuoteQty/$request->origQty;
+                        $size = $request->origQty;
+                        $fee = 0;
+                        foreach ($request->fills as $fill) {
+                            if ($fill->commissionAsset === "USDT") {
+                                $fee += $fill->commission;
+                            } else {
+                                $fee += ($fill->commission * $fill->price);
+                            }
+                        }
+
                         array_push($users, [
                             'username' => $user->username,
-                            'size' => $size
+                            'price' => $price,
+                            'size' => $size,
+                            'fee' => $fee,
+                            'created_at' => date("Y-m-d H:i:s")
                         ]);
                     }
                 }
             }
 
             if (count($users)) {
-                $telegram->sendBuy($symbol, $symbolsPrices[$symbol]);
-                $msgID = $telegram->symbolPriceUpdate($symbolsPrices[$symbol], false)->result->message_id;
-                $services->buyCoin($symbol, $symbolsPrices[$symbol], $msgID, $users);
+                $services->buyCoin($symbol, $users);
+                $telegram->sendBuy($symbol, $users);
             }
 
             return true;
         }
 
 
-        public function salesOrder($users, $currency)
+        public function salesOrder($trade)
         {
             $server = new serverAPI();
-            $sizes = [];
 
-            foreach ($users as $user) 
-            {
-                $sizes[$user->username] = $user->size;
+            $body = [
+                "symbol" => $trade->symbol,
+                "side" => "sell",
+                "type" => "market",
+                "quantity" => $trade->size
+            ];
+
+            if (Production) {
+                $request = $this->request('/api/v3/order', true, $server->getUser($trade->username), $body, 'POST');
+            } else {
+                $request = $this->request('/api/v3/order/test', true, $server->getUser($trade->username), $body, 'POST');
             }
 
-            foreach ($server->getUsers() as $user) 
-            {
-                if (isset($sizes[$user->username])) 
+            if ($request) {
+                $price = $request->cummulativeQuoteQty/$request->origQty;
+                $fee = 0;
+
+                foreach ($request->fills as $fill) 
                 {
-                    $body = [
-                        "symbol" => $currency,
-                        "side" => "sell",
-                        "type" => "market",
-                        "quantity" => $sizes[$user->username]
-                    ];
-        
-                    if (Production) {
-                        $this->request('/api/v3/order', true, $user, $body, 'POST');
+                    if ($fill->commissionAsset === "USDT") {
+                        $fee += $fill->commission;
                     } else {
-                        $this->request('/api/v3/order/test', true, $user, $body, 'POST');
+                        $fee += ($fill->commission * $fill->price);
                     }
                 }
+
+                return [
+                    'price' => $price,
+                    'fee' => $fee,
+                    'sold_at' => time()
+                ];
             }
+
+            return [
+                'price' => 0,
+                'fee' => 0,
+                'sold_at' => time()
+            ];
         }
 
 
@@ -400,11 +435,12 @@
             $coins = [];
             $data = [];
             $number = 0;
+            
 
             foreach ($server->getCurrenciesConfig() as $currency) {
                 $price = $currency->price_highest;
 
-                foreach ($trades as $trade) 
+                foreach ($trades as $trade)
                 {
                     if ($trade->symbol == $currency->symbol) {
                         $price = $trade->price;
@@ -470,14 +506,13 @@
         }
 
 
-        public function isSellCoin($trading, $oldChanges = [], $oldPrices = [])
+        public function isSellCoin($trades, $oldChanges = [])
         {
             $server = new serverAPI();
             $telegram = new telegramAPI();
             $services = new Services();
             $currenciesConfig = [];
             $changes = [];
-            $pricesUpdate = [];
             $prices = [];
 
             foreach ($server->getCurrenciesConfig() as $currencyConfig) {
@@ -488,45 +523,31 @@
                 $prices[$tickerPrice->symbol] = $tickerPrice->price;
             }
 
-            foreach ($trading as $coin) {
-                $currentPrice = $prices[$coin->symbol];
+            foreach ($trades as $trade) {
+                $currentPrice = $prices[$trade->symbol];
                 
-                $change = number_format((($currentPrice*100)/$coin->price) - 100, 2);
-                $changes[$coin->id] = $change;
-                
-                $priceUpdate = false;
-                
-                if (isset($oldPrices[$coin->id])) {
-                    if ($currentPrice != $oldPrices[$coin->id]) {
-                        $priceUpdate = true;
-                    }
-                }
+                $change = number_format((($currentPrice*100)/$trade->price) - 100, 2);
+                $changes[$trade->id] = $change;
 
-                if ($priceUpdate) {
-                    $gain = (($currentPrice/$coin->price)*100)-100;
-                    $telegram->symbolPriceUpdate($currentPrice, $coin->msg_id, $gain);
-                }
-
-                $pricesUpdate[$coin->id] = $currentPrice;
-
-                if (isset($oldChanges[$coin->id])) {
-                    $currencyConfig = $currenciesConfig[$coin->symbol];
+                if (isset($oldChanges[$trade->id])) {
+                    $currencyConfig = $currenciesConfig[$trade->symbol];
                     $sell_up = $currencyConfig->ratio_sell;
                     $sell_down = $currencyConfig->execution_sell;
 
-                    if ($oldChanges[$coin->id] >= $sell_up && $change - $oldChanges[$coin->id] < 0) {
-                        $changes[$coin->id] = $oldChanges[$coin->id];
+                    if ($oldChanges[$trade->id] >= $sell_up && $change - $oldChanges[$trade->id] < 0) {
+                        $changes[$trade->id] = $oldChanges[$trade->id];
 
-                        if ($change - $oldChanges[$coin->id] <= ($sell_down - (2*$sell_down))) {
-                            $this->salesOrder(json_decode($coin->users), $coin->symbol);
-                            $services->sellCoin($coin->id, $currentPrice);
-                            $telegram->deleteMsg($coin->msg_id);
-                            $telegram->sendSell($coin->symbol, $currentPrice);
+                        if ($change - $oldChanges[$trade->id] <= ($sell_down - (2*$sell_down))) {
+                            $order = $this->salesOrder($trade);
+                            $services->sellCoin($trade->id, $order);
+                            if ($order['price']) {
+                                $telegram->sendSell($trade->symbol, $trade->username);
+                            }
                         }
                     }
                 }
             }
 
-            return ['changes' => $changes, 'prices' => $pricesUpdate];
+            return $changes;
         }
     }

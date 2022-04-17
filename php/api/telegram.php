@@ -47,18 +47,23 @@
             return $this->request('/sendMessage', $msg, $disableNotification, $reply);
         }
 
-        public function sendBuy($symbol, $symbolPrice)
+        public function sendBuy($symbol, $users)
         {
-            $msg = "<b>🤖 I just bought {$symbol} and the price was {$symbolPrice}$</b>";
+            printCmd($users);
+            if (count($users) === 1) {
+                $msg = "<b>🤖 I just bought {$symbol} for user {$users[0]['username']}</b>";
+            } else {
+                $msg = "<b>🤖 I just bought {$symbol} for ".count($users)." users</b>";
+            }
 
             $this->sendMsg($msg, false);
 
             return true;
         }
 
-        public function sendSell($symbol, $symbolPrice)
-        {            
-            $msg = "<b>🤖 I sold {$symbol} when it hit {$symbolPrice}$</b>";
+        public function sendSell($symbol, $username)
+        {
+            $msg = "<b>🤖 I sold {$symbol} for user {$username}</b>";
             
             $this->sendMsg($msg, false);
 
