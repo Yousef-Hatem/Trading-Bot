@@ -16,13 +16,24 @@ function trade()
     
     if ($services->getStatus()) {
         $binance = new binanceAPI();
+        $server = new serverAPI();
 
         $trading = $services->isTrading();
+        $CurrenciesConfig = $server->getCurrenciesConfig();
+        $tickersPrice = $binance->getTickersPrice();
         
-        $changes['sell'] = $binance->isSellCoin($trading, $changes['sell']);
-            
+        $isSellCoinTime = time();
+        $changes['sell'] = $binance->isSellCoin($trading, $changes['sell'], $CurrenciesConfig, $tickersPrice);
+        
+        if ((time() - $isSellCoinTime) >= 10) {
+            $CurrenciesConfig = $server->getCurrenciesConfig();
+            $tickersPrice = $binance->getTickersPrice();
+        }
+
+        $trading = $services->isTrading();
+
         if ($max_grids > count($trading)) {
-            $changes['buy'] = $binance->perfectSymbols($changes['buy'], $max_grids - count($trading));
+            $changes['buy'] = $binance->perfectSymbols($changes['buy'], $max_grids - count($trading), $tickersPrice, $CurrenciesConfig, $trading);
         }
     }
 

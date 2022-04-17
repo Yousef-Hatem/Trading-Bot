@@ -49,7 +49,6 @@
 
         public function sendBuy($symbol, $users)
         {
-            printCmd($users);
             if (count($users) === 1) {
                 $msg = "<b>🤖 I just bought {$symbol} for user {$users[0]['username']}</b>";
             } else {

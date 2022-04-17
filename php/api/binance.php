@@ -314,30 +314,32 @@
         }
 
 
-        public function newOrder($symbol)
+        public function newOrder($symbol, $tickersPrice, $trades, $currenciesConfig)
         {
             $server = new serverAPI();
             $telegram = new telegramAPI();
             $services = new Services();
             $users = [];
-
+            $exchangeInfo = null;
+            
             $symbolsPrices = [];
-            foreach ($this->getTickersPrice() as $tickerPrice) {
+            foreach ($tickersPrice as $tickerPrice) {
                 $symbolsPrices[$tickerPrice->symbol] = $tickerPrice->price;
             }
 
-            $exchangeInfo = $this->exchangeInfo($symbol);
             $body = [
                 "symbol" => $symbol,
                 "side" => "buy",
                 "type" => "market"
             ];
-
-            $trades = $services->isTrading();
-            $currenciesConfig = $server->getCurrenciesConfig();
             
             foreach ($server->getUsers() as $user) {
                 if ($this->permissionBuy($user, $symbol, $symbolsPrices, $trades, $currenciesConfig)) {
+
+                    if ($exchangeInfo == null) {
+                        $exchangeInfo = $this->exchangeInfo($symbol);
+                    }
+
                     $funds = $user->budget_coin/30;
                     
                     $size = $this->symbolSizeFormat($symbol, $funds/$symbolsPrices[$symbol], $exchangeInfo->symbols[0]->filters);
@@ -426,18 +428,14 @@
         }
 
 
-        public function perfectSymbols($oldChanges = null, $max)
+        public function perfectSymbols($oldChanges = null, $max, $tickersPrice, $currenciesConfig, $trades)
         {
-            $server = new serverAPI();
-            $services = new Services();
-            $trades = $services->isTrading();
             $currencies = [];
             $coins = [];
             $data = [];
             $number = 0;
             
-
-            foreach ($server->getCurrenciesConfig() as $currency) {
+            foreach ($currenciesConfig as $currency) {
                 $price = $currency->price_highest;
 
                 foreach ($trades as $trade)
@@ -454,7 +452,7 @@
                 ];
             }
 
-            foreach ($this->getTickersPrice() as $symbol) {
+            foreach ($tickersPrice as $symbol) {
                 if (isset($currencies[$symbol->symbol])) {
                     $oldPrice = $currencies[$symbol->symbol]['price'];
 
@@ -484,7 +482,7 @@
                             
                             if ($change >= $currency['buy_up']) {
                                 printCmd($data[$key]." - ".$oldChange." >= ".$currency['buy_up'], $key);
-                                $this->newOrder($key);
+                                $this->newOrder($key, $tickersPrice, $trades, $currenciesConfig);
                                 $number++;
 
                                 unset($data[$key]);
@@ -506,20 +504,19 @@
         }
 
 
-        public function isSellCoin($trades, $oldChanges = [])
+        public function isSellCoin($trades, $oldChanges = [], $getCurrenciesConfig, $tickersPrice)
         {
-            $server = new serverAPI();
             $telegram = new telegramAPI();
             $services = new Services();
             $currenciesConfig = [];
             $changes = [];
             $prices = [];
 
-            foreach ($server->getCurrenciesConfig() as $currencyConfig) {
+            foreach ($getCurrenciesConfig as $currencyConfig) {
                 $currenciesConfig[$currencyConfig->symbol] = $currencyConfig;
             }
 
-            foreach ($this->getTickersPrice() as $tickerPrice) {
+            foreach ($tickersPrice as $tickerPrice) {
                 $prices[$tickerPrice->symbol] = $tickerPrice->price;
             }
 
