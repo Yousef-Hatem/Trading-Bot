@@ -71,6 +71,9 @@
                         }
                     }
                     printCmd("({$data->code}) {$data->msg} \n URL: {$route}", "Error");
+                    if ($data->code == -2010) {
+                        return $data->code;
+                    }
                     return false;
                 }
             }
@@ -301,7 +304,7 @@
                 
                 if ($numberDeals < $maxNumberDeals && $numberDeals > 0) {
                     return true;
-                } elseif($numberDeals == $maxNumberDeals) {
+                } elseif($numberDeals >= $maxNumberDeals) {
                     return false;
                 }
     
@@ -394,13 +397,15 @@
                 "quantity" => $trade->size
             ];
 
+            printCmd($trade);
+
             if (Production) {
                 $request = $this->request('/api/v3/order', true, $server->getUser($trade->username), $body, 'POST');
             } else {
                 $request = $this->request('/api/v3/order/test', true, $server->getUser($trade->username), $body, 'POST');
             }
 
-            if ($request) {
+            if (isset($request->symbol)) {
                 $price = $request->cummulativeQuoteQty/$request->origQty;
                 $fee = 0;
 
@@ -420,11 +425,15 @@
                 ];
             }
 
-            return [
-                'price' => 0,
-                'fee' => 0,
-                'sold_at' => time()
-            ];
+            if ($request == -2010) {
+                return [
+                    'price' => 0,
+                    'fee' => 0,
+                    'sold_at' => time()
+                ];
+            }
+
+            return false;
         }
 
 
@@ -536,9 +545,11 @@
 
                         if ($change - $oldChanges[$trade->id] <= ($sell_down - (2*$sell_down))) {
                             $order = $this->salesOrder($trade);
-                            $services->sellCoin($trade->id, $order);
-                            if ($order['price']) {
-                                $telegram->sendSell($trade->symbol, $trade->username);
+                            if ($order) {
+                                $services->sellCoin($trade->id, $order);
+                                if ($order['price']) {
+                                    $telegram->sendSell($trade->symbol, $trade->username);
+                                }
                             }
                         }
                     }

@@ -4,6 +4,7 @@
 
         public function request($route) {
             $API = new API();
+            $telegram = new telegramAPI();
 
             $url = "http://207.148.65.66/api".$route;
             $headers = ["YB-KEY: ". AT_KEY];
@@ -17,6 +18,7 @@
                 
                 printCmd($request->message, 'Error');
                 printCmd($url, 'URL');
+                $telegram->sendErrorServer($url, $request->message);
                 return false;
             } else {
                 return $this->request($route);
@@ -31,6 +33,8 @@
 
         public function getUser($username)
         {
+            $username = str_replace(' ', '', $username);
+            
             return $this->request("/coinusers/{$username}")->data;
         }
 

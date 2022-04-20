@@ -69,6 +69,18 @@
             return true;
         }
 
+        public function sendErrorServer($URL, $error)
+        {
+            $msg = "An error has occurred in this API
+URL: {$URL}
+Error: {$error}
+This may cause some problems in the system if this error persists";
+
+            $this->sendMsg($msg, false);
+
+            return true;
+        }
+
         public function sendError($data, $route, $user)
         {
             $r = explode('?', $route);
@@ -206,7 +218,7 @@
                     break;
 
                 case 'Help':
-                    $text = "Hello <b>`.$name.`</b>
+                    $text = "Hello <b>$name</b>
 You can ask for help at any time
 I'm a bot working here and this system is designed for you.
 
@@ -249,10 +261,11 @@ If you need any help. Anytime, I'll be with you";
 
                 case 'Who programmed you':
                     $text = 'Name: <b>Yousef Hatem</b>
-
 Email: <b>yousef26hatem@gmail.com</b>
 Phone Number: <b>+201146635939</b>
-<a href="https://t.me/Yousef26Hatem">Telegram</a> - <a href="https://github.com/Yousef-Hatem">GitHub</a>';
+<a href="https://t.me/Yousef26Hatem">Telegram</a> - <a href="https://github.com/Yousef-Hatem">GitHub</a>
+
+';
                     break;
                     
                 case 'Edit max grids':
