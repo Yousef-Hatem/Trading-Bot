@@ -368,6 +368,7 @@
 
                         array_push($users, [
                             'username' => $user->username,
+                            'orderId' => $request->orderId,
                             'price' => $price,
                             'size' => $size,
                             'fee' => $fee,
@@ -394,10 +395,8 @@
                 "symbol" => $trade->symbol,
                 "side" => "sell",
                 "type" => "market",
-                "quantity" => $trade->size
+                "quantity" => $this->symbolSizeFormat($trade->symbol, $trade->size - ($trade->fee/$trade->price)) 
             ];
-
-            printCmd($trade);
 
             if (Production) {
                 $request = $this->request('/api/v3/order', true, $server->getUser($trade->username), $body, 'POST');
@@ -419,6 +418,7 @@
                 }
 
                 return [
+                    'orderId' => $request->orderId,
                     'price' => $price,
                     'fee' => $fee,
                     'sold_at' => time()
@@ -427,6 +427,7 @@
 
             if ($request == -2010) {
                 return [
+                    'orderId' => 0,
                     'price' => 0,
                     'fee' => 0,
                     'sold_at' => time()
